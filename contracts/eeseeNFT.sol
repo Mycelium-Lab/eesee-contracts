@@ -20,16 +20,16 @@ contract eeseeNFT is ERC721A, Ownable {
         return _startTokenId();
     }
 
+    function _startTokenId() internal pure override returns (uint256) {
+        return 1;
+    }
+
     function nextTokenId() external view returns (uint256) {
         return _nextTokenId();
     }
 
     function _baseURI() internal view override returns (string memory) {
         return URI;
-    }
-
-    function _startTokenId() internal pure override returns (uint256) {
-        return 1;
     }
 
     //TODO:royalty like opensea!!!

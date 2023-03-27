@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
@@ -21,6 +22,20 @@ interface IEesee {
      * @dev Listing:
      * {ID} - Id of the Listing, starting from 1.
      * {nft} - NFT sold in this listing. 
+     * {owner} - Listing creator.
+     * {maxTickets} - Amount of tickets sold in this listing. 
+     * {ticketIDBuyer} - The buyer of the specified ticket.
+     * {ticketsBoughtByAddress} - Amount of tickets bought by address.
+     * {ticketPrice} - Price of a single ticket.
+     * {ticketsBought} - Amount of tickets bought.
+     * {devFee} - Fee sent to {feeCollector}.
+     * {poolFee} - Fee sent to {rewardPool}.
+     * {creationTime} - Listing creation time.
+     * {duration} - Listing duration.
+     * {winner} - Selected winner.
+     * {chainlinkRequestSent} - Is Chainlink request sent for this listing.
+     * {itemClaimed} - Is NFT claimed/reclaimed.
+     * {tokensClaimed} - Are tokens claimed.
      */
     struct Listing {
         uint256 ID;
@@ -36,7 +51,7 @@ interface IEesee {
         uint256 creationTime;
         uint256 duration;
         address winner;
-        bool fulfilmentPending;
+        bool chainlinkRequestSent;
         bool itemClaimed;
         bool tokensClaimed;
     }
@@ -156,11 +171,12 @@ interface IEesee {
         uint256 creationTime,
         uint256 duration,
         address winner,
-        bool fulfilmentPending,
+        bool chainlinkRequestSent,
         bool itemClaimed,
         bool tokensClaime
     );
 
+    function ESE() external view returns(IERC20);
     function rewardPool() external view returns(address);
     function publicMinter() external view returns(eeseeNFT);
 
