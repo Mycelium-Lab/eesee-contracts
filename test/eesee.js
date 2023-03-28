@@ -28,6 +28,7 @@ const {
         
         ESE = await _ESE.deploy('1000000000000000000000000')
         await ESE.deployed()
+        await ESE.transfer(acc2.address, '10000000000000000000000')
         
         pool = await _pool.deploy(ESE.address)
         await pool.deployed()
@@ -40,10 +41,10 @@ const {
             pool.address, 
             '', 
             acc4.address, 
-            mockVRF.address,//vrfCoordinator
+            mockVRF.address,
             zeroAddress,//ChainLink token
             '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
-            1,//minimumRequestConfirmations
+            0,//minimumRequestConfirmations
             100000//callbackGasLimit
         )
         await eesee.deployed()
@@ -54,6 +55,7 @@ const {
         await NFT.approve(eesee.address, 1)
         await NFT.approve(eesee.address, 2)
         await NFT.approve(eesee.address, 3)
+        await ESE.connect(acc2).approve(eesee.address, '0xfffffffffffffffffffffffffffffffff')
     })
 
     it('Lists NFT', async () => {
@@ -63,9 +65,9 @@ const {
         await expect(eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 100, 0, 2592001)).to.be.revertedWith('eesee: Duration must be less or equal maxDuration')
         
         const ID = 1
-        await /*expect(*/eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 100, 2, 86400)/*)
+        await expect(eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 100, 2, 86400))
             .to.emit(eesee, "ListItem")
-            .withArgs(ID, {token: NFT.address, tokenID: 1}, signer.address, 100, 2, 86400)*/
+            .withArgs(ID, anyValue, signer.address, 100, 2, 86400)//{token: NFT.address, tokenID: 1} produces wrong hash for some reason
 
         const listing = await eesee.listings(ID);
         assert.equal(listing.ID.toString(), ID.toString(), "ID is correct")
@@ -84,5 +86,38 @@ const {
         assert.equal(listing.itemClaimed, false, "itemClaimed is correct")
         assert.equal(listing.tokensClaimed, false, "tokensClaimed is correct")
     })
+
+    it('Buys tickets', async () => {
+        const ID = 1
+        await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWith("eesee: Amount must be above zero")
+        await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWith('eesee: Listing does not exist')
+        //await expect(eesee.connect(signer).buyTickets()).to.be.revertedWith('eesee: Listing has already expired')
+        //await expect(eesee.connect(signer).buyTickets()).to.be.revertedWith('eesee: Listing fulfilment is already pending')
+        //eesee: All tickets bought
+        await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWith('eesee: Max tickets bought by this address')
+
+        const balanceBefore = await ESE.balanceOf(acc2.address)
+        const recipt = expect(eesee.connect(acc2).buyTickets(ID, 20))
+        for (let i = 0; i < 20; i++) {
+            await recipt.to.emit(eesee, "BuyTicket").withArgs(ID, acc2.address, i, 2)
+
+            const buyer = await eesee.getListingTicketIDBuyer(ID, i)
+            assert.equal(buyer, acc2.address, "Ticket buyer is correct")
+        }
+
+        const tickets = await eesee.getListingTicketsBoughtByAddress(ID, acc2.address)
+        assert.equal(tickets, 20, "Tickets bought by address is correct")
+
+        const balanceAfter = await ESE.balanceOf(acc2.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
+
+        await expect(eesee.connect(acc2).buyTickets(ID, 1)).to.be.revertedWith("eesee: Max tickets bought by this address")
+
+        const listing = await eesee.listings(ID);
+        assert.equal(listing.ticketsBought, 20, "ticketsBought is correct")
+    })
+
+    //Buy all tickets and check if RequestWords() event was called, chainlinkRequestSent set to true, chainlinkRequestIDs is set
+    //Also, need to check the period between requestRandomWords call and fulfillRandomWords for vulnerabilities
   });
   
