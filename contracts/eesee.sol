@@ -79,6 +79,9 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         keyHash = _keyHash;
         minimumRequestConfirmations = _minimumRequestConfirmations;
         callbackGasLimit = _callbackGasLimit;
+
+        //Create dummy listing at index 0
+        listings.push();
     }
 
     // ============ External Methods ============
@@ -377,8 +380,9 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         require(maxTickets >= 2, "eesee: Max tickets must be more or equal 2");
         require(ticketPrice > 0, "eesee: Ticket price must be above zero");
 
-        ID = listings.length + 1;
-        Listing storage listing = listings[ID];
+        ID = listings.length;
+
+        Listing storage listing = listings.push();
         listing.ID = ID;
         listing.nft = nft;
         listing.owner = msg.sender;
