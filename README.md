@@ -19,7 +19,7 @@ To run tests run `npx hardhat test` in the console.
 
 ## Docs
 
-Docs to all dWill functions are located in `/docs/index.md`. 
+Docs to all eesee functions are located in `/docs/index.md`. 
 Contracts also contain comments to all functions describing what the function does, parameters and their return values.
 
 
