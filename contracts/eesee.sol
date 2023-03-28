@@ -46,6 +46,12 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     VRFCoordinatorV2Interface immutable public vrfCoordinator;
     ///@dev Chainlink VRF V2 subscription ID.
     uint64 immutable public subscriptionID;
+    ///@dev Chainlink VRF V2 key hash to call requestRandomWords() with.
+    bytes32 immutable public keyHash;
+    ///@dev Chainlink VRF V2 request confirmations.
+    uint16 immutable public minimumRequestConfirmations;
+    ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
+    uint32 immutable private callbackGasLimit;
 
     constructor(
         IERC20 _ESE,
@@ -53,7 +59,10 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         string memory baseURI,
         address _feeCollector,
         address _vrfCoordinator, 
-        LinkTokenInterface _LINK
+        LinkTokenInterface _LINK,
+        bytes32 _keyHash,
+        uint16 _minimumRequestConfirmations,
+        uint32 _callbackGasLimit
     ) VRFConsumerBaseV2(_vrfCoordinator) {
         ESE = _ESE;
         rewardPool = _rewardPool;
@@ -67,6 +76,9 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         subscriptionID = vrfCoordinator.createSubscription();
         vrfCoordinator.addConsumer(subscriptionID, address(this));
         LINK = _LINK;
+        keyHash = _keyHash;
+        minimumRequestConfirmations = _minimumRequestConfirmations;
+        callbackGasLimit = _callbackGasLimit;
     }
 
     // ============ External Methods ============
@@ -190,7 +202,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             //13 - requestConfirmations (13 for POS)
             //200000 - callbackGasLimit //TODO: test if this is enough
             //1 - numWords
-            uint256 requestID = vrfCoordinator.requestRandomWords(0x8af398995b04c28e9951adb9721ef74c74f93e6a478f39e7e0777be13527e7ef, subscriptionID, 13, 200000, 1);
+            uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
             chainlinkRequestIDs[requestID] = ID;
             emit RequestWords(ID, requestID);
         }
@@ -201,17 +213,22 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param IDs - IDs of listings to claim NFTs in.
      * @param recipient - Address to send NFTs to. 
      
-     * @return NFTs - NFTs received.
+     * @return tokens - Addresses of tokens received.
+     * @return tokenIDs - IDs of tokens received.
+     * Note: Returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
-    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(NFT[] memory NFTs){
-        NFTs = new NFT[](IDs.length);
+    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs){
+        tokens = new IERC721[](IDs.length);
+        tokenIDs = new uint256[](IDs.length);
+
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
             require(listing.winner == msg.sender, "eesee: Caller is not the winner");
             require(!listing.itemClaimed, "eesee: Item has already been claimed");
 
-            NFTs[i] = listing.nft;
+            tokens[i] = listing.nft.token;
+            tokenIDs[i] = listing.nft.tokenID;
             listing.itemClaimed = true;
             listing.nft.token.safeTransferFrom(address(this), recipient, listing.nft.tokenID);
 
@@ -256,12 +273,16 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     /**
      * @dev Reclaim NFTs from expired listings. Emits {ReclaimItem} event for each listing ID.
      * @param IDs - IDs of listings to reclaim NFTs in.
-     * @param recipient - Address to send NFTs to. 
+     * @param recipient - Address to send NFTs to.
      
-     * @return NFTs - NFTs reclaimed.
+     * @return tokens - Addresses of tokens reclaimed.
+     * @return tokenIDs - IDs of tokens reclaimed.
+     * Note: returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
-    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(NFT[] memory NFTs){
-        NFTs = new NFT[](IDs.length);
+    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs){
+        tokens = new IERC721[](IDs.length);
+        tokenIDs = new uint256[](IDs.length);
+
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
@@ -270,7 +291,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             require(!listing.chainlinkRequestSent, "eesee: Listing fulfilment is already pending");
             require(!listing.itemClaimed, "eesee: Item has already been claimed");
 
-            NFTs[i] = listing.nft;
+            tokens[i] = listing.nft.token;
+            tokenIDs[i] = listing.nft.tokenID;
             listing.itemClaimed = true;
             listing.nft.token.safeTransferFrom(address(this), recipient, listing.nft.tokenID);
 

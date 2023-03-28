@@ -1,13 +1,29 @@
-# Sample Hardhat Project
+## eesee - NFT marketplace
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+# Smart Contracts
+## Development
 
-Try running some of the following tasks:
+1. Create and fill in `.env` file using `.env.org` example file
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.js
-```
+2. Run `npm i` to install all packages
+
+3. Compile all contracts before running migrations `npx hardhat compile`
+
+4. Deploy with `npx hardhat run ./scripts/deploy.js --network <network>`
+
+
+## Testing
+
+To run tests run `npx hardhat test` in the console.
+
+
+## Docs
+
+Docs to all dWill functions are located in `/docs/index.md`. 
+Contracts also contain comments to all functions describing what the function does, parameters and their return values.
+
+
+## Deployments
+1. goerli: ``
+2. ethereum: ``
+3. polygon: ``

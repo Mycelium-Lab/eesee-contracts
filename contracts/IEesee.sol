@@ -191,6 +191,8 @@ interface IEesee {
     function LINK() external view returns(LinkTokenInterface);
     function vrfCoordinator() external view returns(VRFCoordinatorV2Interface);
     function subscriptionID() external view returns(uint64);
+    function keyHash() external view returns(bytes32);
+    function minimumRequestConfirmations() external view returns(uint16);
 
     function listItem(NFT memory nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns(uint256 ID);
     function mintAndListItems(
@@ -209,10 +211,10 @@ interface IEesee {
 
     function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent);
 
-    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(NFT[] memory NFTs);
+    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs);
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
-    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(NFT[] memory NFTs);
+    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs);
     function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
     function getListingsLength() external view returns(uint256 length);
