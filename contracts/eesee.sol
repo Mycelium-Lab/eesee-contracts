@@ -199,11 +199,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
         if(listing.ticketsBought == listing.maxTickets){
             listing.chainlinkRequestSent = true;
-            //ETHEREUM CONFIG
-            //0x8af398995b04c28e9951adb9721ef74c74f93e6a478f39e7e0777be13527e7ef - 200 gwei hash
-            //13 - requestConfirmations (13 for POS)
-            //200000 - callbackGasLimit //TODO: test if this is enough
-            //1 - numWords
             uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
             chainlinkRequestIDs[requestID] = ID;
             emit RequestWords(ID, requestID);
