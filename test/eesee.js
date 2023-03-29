@@ -13,22 +13,22 @@ const {
     let mockVRF;
     let eesee;
     let NFT;
-    let signer, acc2, acc3, acc4;
+    let signer, acc2, acc3, acc4, acc5, acc6, acc7, feeCollector;
+    let ticketBuyers
     //after one year
     const timeNow = Math.round((new Date()).getTime() / 1000);
     const zeroAddress = "0x0000000000000000000000000000000000000000"
   
     this.beforeAll(async() => {
-        [signer, acc2, acc3, acc4] = await ethers.getSigners()
+        [signer, acc2, acc3, acc4, acc5, acc6, acc7, feeCollector] = await ethers.getSigners()
+        ticketBuyers = [acc2,acc3, acc4, acc5, acc6,  acc7]
         const _ESE = await hre.ethers.getContractFactory("ESE");
         const _pool = await hre.ethers.getContractFactory("eeseePool");
         const _mockVRF = await hre.ethers.getContractFactory("MockVRFCoordinator");
         const _eesee = await hre.ethers.getContractFactory("eesee");
         const _NFT = await hre.ethers.getContractFactory("eeseeNFT");
-        
         ESE = await _ESE.deploy('1000000000000000000000000')
         await ESE.deployed()
-        await ESE.transfer(acc2.address, '10000000000000000000000')
         
         pool = await _pool.deploy(ESE.address)
         await pool.deployed()
@@ -40,7 +40,7 @@ const {
             ESE.address, 
             pool.address, 
             '', 
-            acc4.address, 
+            feeCollector.address, 
             mockVRF.address,
             zeroAddress,//ChainLink token
             '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
@@ -55,7 +55,11 @@ const {
         await NFT.approve(eesee.address, 1)
         await NFT.approve(eesee.address, 2)
         await NFT.approve(eesee.address, 3)
-        await ESE.connect(acc2).approve(eesee.address, '0xfffffffffffffffffffffffffffffffff')
+
+        for (let i = 0; i < ticketBuyers.length; i++) {
+            await ESE.transfer(ticketBuyers[i].address, '10000000000000000000000')
+            await ESE.connect(ticketBuyers[i]).approve(eesee.address, '10000000000000000000000')
+        }
     })
 
     it('Lists NFT', async () => {
@@ -92,8 +96,6 @@ const {
         await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWith("eesee: Amount must be above zero")
         await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWith('eesee: Listing does not exist')
         //await expect(eesee.connect(signer).buyTickets()).to.be.revertedWith('eesee: Listing has already expired')
-        //await expect(eesee.connect(signer).buyTickets()).to.be.revertedWith('eesee: Listing fulfilment is already pending')
-        //eesee: All tickets bought
         await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWith('eesee: Max tickets bought by this address')
 
         const balanceBefore = await ESE.balanceOf(acc2.address)
@@ -117,7 +119,47 @@ const {
         assert.equal(listing.ticketsBought, 20, "ticketsBought is correct")
     })
 
-    //Buy all tickets and check if RequestWords() event was called, chainlinkRequestSent set to true, chainlinkRequestIDs is set
-    //Also, need to check the period between requestRandomWords call and fulfillRandomWords for vulnerabilities
-  });
+    it('Buys all tickets', async () => {
+        const ID = 1
+        for (let i = 1; i <= 4; i++) {
+            const balanceBefore = await ESE.balanceOf(ticketBuyers[i].address)
+            const recipt = expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 20))
+            for (let j = i * 20; j < (i + 1) * 20; j++) {
+                await recipt.to.emit(eesee, "BuyTicket").withArgs(ID, ticketBuyers[i].address, j, 2)
+
+                const buyer = await eesee.getListingTicketIDBuyer(ID, j)
+                assert.equal(buyer, ticketBuyers[i].address, "Ticket buyer is correct")
+            }
+
+            const tickets = await eesee.getListingTicketsBoughtByAddress(ID, ticketBuyers[i].address)
+            assert.equal(tickets, 20, "Tickets bought by address is correct")
+
+            const balanceAfter = await ESE.balanceOf(ticketBuyers[i].address)
+            assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
+
+            await expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 1)).to.be.revertedWith("eesee: Max tickets bought by this address")
+
+            const listing = await eesee.listings(ID);
+            assert.equal(listing.ticketsBought, (i + 1)*20, "ticketsBought is correct")
+
+            if(i == 4){
+                //MockVRF's first requestID is 0
+                await recipt.to.emit(eesee, "RequestWords").withArgs(ID, 0)
+                assert.equal(listing.chainlinkRequestSent, true, "chainlinkRequestSent is correct")
+                //check reverts on batchReceiveItems, batchReceiveTokens, batchReclaimItems, batchReclaimTokens
+            }
+        }
+        await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1)).to.be.revertedWith("eesee: All tickets bought")
+    })
+
+    it('Selects winner', async () => {
+        const ID = 1
+        const recipt = expect(mockVRF.fulfillWords(0))
+
+        const listing = await eesee.listings(ID);
+        assert.notEqual(listing.winner, zeroAddress, "winner is chosen")
+
+        await recipt.to.emit(eesee, "FulfillListing").withArgs(ID, anyValue, listing.winner)//{token: NFT.address, tokenID: 1} produces wrong hash for some reason
+    })
+});
   

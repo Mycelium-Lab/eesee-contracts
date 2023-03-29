@@ -180,7 +180,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         Listing storage listing = listings[ID];
         require(listing.owner != address(0), "eesee: Listing does not exist");
         require(block.timestamp <= listing.creationTime + listing.duration, "eesee: Listing has already expired");
-        require(!listing.chainlinkRequestSent, "eesee: Listing fulfilment is already pending");
 
         tokensSpent = listing.ticketPrice * amount;
         ESE.safeTransferFrom(msg.sender, address(this), tokensSpent);
