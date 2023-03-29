@@ -30,7 +30,7 @@ async function main() {
             '0x326C977E6efc84E512bB9C30f76E30c160eD06FB',//ChainLink token
             '0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15',//150 gwei hash
             3,//minimumRequestConfirmations
-            100000//callbackGasLimit
+            50000//callbackGasLimit
         )
     }else if(network.tags.mainnet){
         _eesee = await eesee.deploy(
@@ -42,7 +42,7 @@ async function main() {
             '0x514910771AF9Ca656af840dff83E8264EcF986CA',//ChainLink token
             '0x8af398995b04c28e9951adb9721ef74c74f93e6a478f39e7e0777be13527e7ef',//150 gwei hash
             13,//minimumRequestConfirmations
-            100000//callbackGasLimit
+            50000//callbackGasLimit
         )
     }else if(network.tags.polygon){
         _eesee = await eesee.deploy(
@@ -54,7 +54,7 @@ async function main() {
             '0xb0897686c545045aFc77CF20eC7A532E3120E0F1',//ChainLink token
             '0x6e099d640cde6de9d40ac749b4b594126b0169747122711109c9985d47751f93',//200 gwei hash
             13,//minimumRequestConfirmations
-            100000//callbackGasLimit
+            50000//callbackGasLimit
         )
     }else{
         return

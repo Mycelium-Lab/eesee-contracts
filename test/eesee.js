@@ -45,7 +45,7 @@ const {
             zeroAddress,//ChainLink token
             '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
             0,//minimumRequestConfirmations
-            100000//callbackGasLimit
+            50000//callbackGasLimit
         )
         await eesee.deployed()
 
@@ -161,5 +161,10 @@ const {
 
         await recipt.to.emit(eesee, "FulfillListing").withArgs(ID, anyValue, listing.winner)//{token: NFT.address, tokenID: 1} produces wrong hash for some reason
     })
+
+    //also check batch receive multiple at the same time
+    it('Receives item after win', async () => {})
+
+    //check item collection after deadline && buyTickets revert after deadline
 });
   
