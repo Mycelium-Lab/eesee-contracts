@@ -51,10 +51,11 @@ const {
 
         NFT = await _NFT.deploy("TEST", "TST", '')
         await NFT.deployed()
-        await NFT.mint(3)
+        await NFT.mint(4)
         await NFT.approve(eesee.address, 1)
         await NFT.approve(eesee.address, 2)
         await NFT.approve(eesee.address, 3)
+        await NFT.approve(eesee.address, 4)
 
         for (let i = 0; i < ticketBuyers.length; i++) {
             await ESE.transfer(ticketBuyers[i].address, '10000000000000000000000')
@@ -90,7 +91,36 @@ const {
         assert.equal(listing.itemClaimed, false, "itemClaimed is correct")
         assert.equal(listing.tokensClaimed, false, "tokensClaimed is correct")
     })
-
+    it('Batch lists NFT', async () => {
+        await expect(eesee.connect(signer).batchListItems(
+            [
+                {
+                    nft: { token: NFT.address, tokenID: 2 },
+                    maxTickets: 50,
+                    ticketPrice: 3,
+                    duration: 86400
+                },
+                {
+                    nft: { token: NFT.address, tokenID: 3 },
+                    maxTickets: 150,
+                    ticketPrice: 4,
+                    duration: 86400
+                },
+                {
+                    nft: { token: NFT.address, tokenID: 4 },
+                    maxTickets: 200,
+                    ticketPrice: 5,
+                    duration: 86400
+                }
+            ]
+        ))
+        .to.emit(eesee, "ListItem")
+        .withArgs(2, anyValue, signer.address, 50, 3, 86400)
+        .and.to.emit(eesee, "ListItem")
+        .withArgs(3, anyValue, signer.address, 150, 4, 86400)
+        .and.to.emit(eesee, "ListItem")
+        .withArgs(4, anyValue, signer.address, 200, 5, 86400)
+    })
     it('Buys tickets', async () => {
         const ID = 1
         await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWith("eesee: Amount must be above zero")
