@@ -98,7 +98,7 @@ contract eeseePool is Ownable{
      * @return bool - Does {claim} exist in merkle root.
      */
     function verifyClaim(address claimer, Claim memory claim) public view returns (bool) {
-        bytes32 leaf = keccak256(abi.encodePacked(claimer, claim.balance));
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(claimer, claim.balance))));
         return MerkleProof.verify(claim.merkleProof, rewardRoot[claim.rewardID], leaf);
     }
 }
