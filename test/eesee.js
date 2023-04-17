@@ -126,7 +126,9 @@ const {
     })
 
     it('mints and lists NFT', async () => {
-        
+        const fee = BigInt(await eesee.mintFee())
+
+        let feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
         let balanceBefore = await ESE.balanceOf(acc8.address)
         await expect(eesee.connect(acc8).mintAndListItem(
             50,
@@ -135,9 +137,15 @@ const {
         ))
         .to.emit(eesee, "ListItem")
         .withArgs(5, anyValue, acc8.address, 50, 3, 86400)
-        let balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+        .and.to.emit(eesee, "CollectDevFee")
+        .withArgs(feeCollector.address, fee)
 
+        let feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
+        let balanceAfter = await ESE.balanceOf(acc8.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
+        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
+
+        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
         balanceBefore = await ESE.balanceOf(acc8.address)
         await expect(eesee.connect(acc8).mintAndListItems(
             [50, 10, 66],
@@ -150,9 +158,15 @@ const {
         .withArgs(7, anyValue, acc8.address, 10, 4, 86401)
         .and.to.emit(eesee, "ListItem")
         .withArgs(8, anyValue, acc8.address, 66, 5, 86402)
-        balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+        .and.to.emit(eesee, "CollectDevFee")
+        .withArgs(feeCollector.address, fee)
 
+        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
+        balanceAfter = await ESE.balanceOf(acc8.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
+        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
+
+        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
         balanceBefore = await ESE.balanceOf(acc8.address)
         await expect(eesee.connect(acc8).mintAndListItemWithDeploy(
             "APES",
@@ -164,9 +178,15 @@ const {
         ))
         .to.emit(eesee, "ListItem")
         .withArgs(9, anyValue, acc8.address, 50, 3, 86400)
-        balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+        .and.to.emit(eesee, "CollectDevFee")
+        .withArgs(feeCollector.address, fee)
 
+        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
+        balanceAfter = await ESE.balanceOf(acc8.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
+        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
+
+        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
         balanceBefore = await ESE.balanceOf(acc8.address)
         await expect(eesee.connect(acc8).mintAndListItemsWithDeploy(
             "APES",
@@ -182,8 +202,13 @@ const {
         .withArgs(11, anyValue, acc8.address, 10, 4, 86401)
         .and.to.emit(eesee, "ListItem")
         .withArgs(12, anyValue, acc8.address, 66, 5, 86402)
+        .and.to.emit(eesee, "CollectDevFee")
+        .withArgs(feeCollector.address, fee)
+        
+        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
         balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
+        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
     })
 
     it('Buys tickets', async () => {
@@ -250,7 +275,6 @@ const {
                 //MockVRF's first requestID is 0
                 await recipt.to.emit(eesee, "RequestWords").withArgs(ID, 0)
                 assert.equal(listing.chainlinkRequestSent, true, "chainlinkRequestSent is correct")
-                //check reverts on batchReceiveItems, batchReceiveTokens, batchReclaimItems, batchReclaimTokens
             }
         }
 
@@ -299,9 +323,30 @@ const {
         const ID = 1
         await expect(eesee.connect(acc2).batchReceiveTokens([ID], acc2.address))
         .to.be.revertedWith("eesee: Caller is not the owner")
+
+        const listing = await eesee.listings(ID);
+        const expectedDevFee = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) * BigInt(listing.devFee) / BigInt('1000000000000000000')
+        const expectedPoolFee = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) * BigInt(listing.poolFee) / BigInt('1000000000000000000')
+        const expectedReceive = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) - expectedDevFee - expectedPoolFee
+
+        const ownerBalanceBefore = await ESE.balanceOf(signer.address)
+        const feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
+        const poolBalanceBefore = await ESE.balanceOf(pool.address)
         await expect(eesee.connect(signer).batchReceiveTokens([ID], signer.address))
         .to.emit(eesee, "ReceiveTokens")
-        .withArgs(ID, signer.address, anyValue) // TODO: calculate amount of tokens recipient will receive
+        .withArgs(ID, signer.address, expectedReceive)
+        .and.to.emit(eesee, "CollectDevFee")
+        .withArgs(feeCollector.address, expectedDevFee)
+        .and.to.emit(eesee, "CollectPoolFee")
+        .withArgs(pool.address, expectedPoolFee)
+        const ownerBalanceAfter = await ESE.balanceOf(signer.address)
+        const feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
+        const poolBalanceAfter = await ESE.balanceOf(pool.address)
+
+        assert.equal(expectedDevFee, BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), "devFee is correct")
+        assert.equal(expectedPoolFee, BigInt(poolBalanceAfter) - BigInt(poolBalanceBefore), "poolFee is correct")
+        assert.equal(expectedReceive, BigInt(ownerBalanceAfter) - BigInt(ownerBalanceBefore), "owner balance is correct")
+
         // reverted with eesee: Listing is not filfilled because listing deleted after previous claim
         await expect(eesee.connect(signer).batchReceiveTokens([ID], signer.address))
         .to.be.revertedWith("eesee: Listing is not filfilled")
@@ -341,5 +386,62 @@ const {
 
         await expect(eesee.connect(signer).batchReclaimItems([4], signer.address))
             .to.be.revertedWith("eesee: Item has already been claimed")
+    })
+    
+    it('Changes constants', async () => {
+        let newValue = 1
+        const minDuration = await eesee.minDuration() 
+        await expect(eesee.connect(acc2).changeMinDuration(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        await expect(eesee.connect(signer).changeMinDuration(newValue))
+        .to.emit(eesee, "ChangeMinDuration")
+        .withArgs(minDuration, newValue)
+        assert.equal(newValue, await eesee.minDuration(), "minDuration has changed")
+
+        const maxDuration = await eesee.maxDuration() 
+        await expect(eesee.connect(acc2).changeMaxDuration(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        await expect(eesee.connect(signer).changeMaxDuration(newValue))
+        .to.emit(eesee, "ChangeMaxDuration")
+        .withArgs(maxDuration, newValue)
+        assert.equal(newValue, await eesee.maxDuration(), "maxDuration has changed")
+
+        const maxTicketsBoughtByAddress = await eesee.maxTicketsBoughtByAddress() 
+        await expect(eesee.connect(acc2).changeMaxTicketsBoughtByAddress(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress('1000000000000000001')).to.be.revertedWith("eesee: Can't set maxTicketsBoughtByAddress to more than 100%")
+        await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress(newValue))
+        .to.emit(eesee, "ChangeMaxTicketsBoughtByAddress")
+        .withArgs(maxTicketsBoughtByAddress, newValue)
+        assert.equal(newValue, await eesee.maxTicketsBoughtByAddress(), "maxTicketsBoughtByAddress has changed")
+
+        const mintFee = await eesee.mintFee() 
+        await expect(eesee.connect(acc2).changeMintFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        await expect(eesee.connect(signer).changeMintFee(newValue))
+        .to.emit(eesee, "ChangeMintFee")
+        .withArgs(mintFee, newValue)
+        assert.equal(newValue, await eesee.mintFee(), "mintFee has changed")
+
+        const devFee = await eesee.devFee() 
+        await expect(eesee.connect(acc2).changeDevFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        //poolFee is 80000000000000000 now so poolFee + devFee > 40%
+        await expect(eesee.connect(signer).changeDevFee('330000000000000000')).to.be.revertedWith("eesee: Can't set fees to more than 40%")
+        await expect(eesee.connect(signer).changeDevFee(newValue))
+        .to.emit(eesee, "ChangeDevFee")
+        .withArgs(devFee, newValue)
+        assert.equal(newValue, await eesee.devFee(), "devFee has changed")
+
+        const poolFee = await eesee.poolFee() 
+        await expect(eesee.connect(acc2).changePoolFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        await expect(eesee.connect(signer).changePoolFee('400000000000000000')).to.be.revertedWith("eesee: Can't set fees to more than 40%")
+        await expect(eesee.connect(signer).changePoolFee(newValue))
+        .to.emit(eesee, "ChangePoolFee")
+        .withArgs(poolFee, newValue)
+        assert.equal(newValue, await eesee.poolFee(), "poolFee has changed")
+
+        newValue = zeroAddress
+        const _feeCollector = await eesee.feeCollector() 
+        await expect(eesee.connect(acc2).changeFeeCollector(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        await expect(eesee.connect(signer).changeFeeCollector(newValue))
+        .to.emit(eesee, "ChangeFeeCollector")
+        .withArgs(_feeCollector, newValue)
+        assert.equal(newValue, await eesee.feeCollector(), "feeCollector has changed")
     })
 });
