@@ -6,7 +6,6 @@ const {
   const { expect } = require("chai");
   const { ethers, network } = require("hardhat");
   const assert = require("assert");
-  
   describe("eesee", function () {
     let ESE;
     let pool;
@@ -179,6 +178,14 @@ const {
                 //check reverts on batchReceiveItems, batchReceiveTokens, batchReclaimItems, batchReclaimTokens
             }
         }
+
+        //buy tickets for listing that will expire
+        const expiredListingID = 2
+        const buyTicketsForExpiredReceipt = expect(eesee.connect(acc7).buyTickets(expiredListingID, 5))
+        for(let i = 0; i < 5; i ++) {
+            await buyTicketsForExpiredReceipt.to.emit(eesee, "BuyTicket").withArgs(expiredListingID, acc7.address, i, 3)
+        }
+        
         await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1)).to.be.revertedWith("eesee: All tickets bought")
     })
 
@@ -193,8 +200,68 @@ const {
     })
 
     //also check batch receive multiple at the same time
-    it('Receives item after win', async () => {})
-
+    it('Receives item after win', async () => {
+        const ID = 1
+        let listing = await eesee.listings(ID)
+        const signers = await ethers.getSigners()
+        const winnerAcc = signers.filter(signer => signer.address === listing.winner)[0]
+        const notWinnerAcc = signers.filter(signer => signer.address !== listing.winner)[0]
+        await expect(eesee.connect(notWinnerAcc).batchReceiveItems([ID], listing.winner))
+        .to.be.revertedWith("eesee: Caller is not the winner")
+        await expect(eesee.connect(winnerAcc).batchReceiveItems([ID], listing.winner))
+        .to.emit(eesee, "ReceiveItem")
+        .withArgs(ID, anyValue, listing.winner)
+        listing = await eesee.listings(ID)
+        assert.equal(listing.itemClaimed, true, "itemClaimed is correct")
+        assert.equal(listing.tokensClaimed, false, "tokensClaimed is correct")
+        assert.equal(listing.chainlinkRequestSent, true, "chainlinkRequestSent is correct")
+        const owner = await NFT.ownerOf(ID)
+        assert.equal(owner, listing.winner, "new owner of NFT is correct")
+        await expect(eesee.connect(winnerAcc).batchReceiveItems([ID], listing.winner))
+        .to.be.revertedWith("eesee: Item has already been claimed")
+    })
+    it('Receives tokens',  async () => {
+        const ID = 1
+        await expect(eesee.connect(acc2).batchReceiveTokens([ID], acc2.address))
+        .to.be.revertedWith("eesee: Caller is not the owner")
+        await expect(eesee.connect(signer).batchReceiveTokens([ID], signer.address))
+        .to.emit(eesee, "ReceiveTokens")
+        .withArgs(ID, signer.address, anyValue) // TODO: calculate amount of tokens recipient will receive
+        // reverted with eesee: Listing is not filfilled because listing deleted after previous claim
+        await expect(eesee.connect(signer).batchReceiveTokens([ID], signer.address))
+        .to.be.revertedWith("eesee: Listing is not filfilled")
+    })
+    it('buyTickets reverts if listing is expired', async () => {
+        const IDs = [2,3,4]
+        const timestampBeforeTimeSkip = (await ethers.provider.getBlock()).timestamp
+        await time.increase(86401)
+        const timestampAfterTimeSkip = (await ethers.provider.getBlock()).timestamp
+        const listing = await eesee.listings(IDs[0])
+        assert.equal(timestampBeforeTimeSkip, timestampAfterTimeSkip-86401, "timetravel is successfull")
+        assert.equal((listing.creationTime.add(listing.duration)).lt(timestampAfterTimeSkip), true, "listing expired")
+        await expect(eesee.connect(acc2).buyTickets(IDs[0], 20)).to.be.revertedWith("eesee: Listing has already expired")
+        await expect(eesee.connect(acc2).buyTickets(IDs[1], 20)).to.be.revertedWith("eesee: Listing has already expired")
+        await expect(eesee.connect(acc2).buyTickets(IDs[2], 20)).to.be.revertedWith("eesee: Listing has already expired")
+    })
+    it('Can reclaim tokens if listing is expired', async () => {
+        const expiredListingID = 2
+        const listing = await eesee.listings(expiredListingID)
+        await expect(eesee.connect(acc7).batchReclaimTokens([expiredListingID], acc7.address))
+        .to.emit(eesee, "ReclaimTokens")
+        .withArgs(expiredListingID, acc7.address, acc7.address, 5, listing.ticketPrice.mul(ethers.BigNumber.from(5))) //emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
+    })
+    it('Can reclaim item if listing is expired', async () => {
+        const IDs = [2,3,4]
+        await expect(eesee.connect(acc2).batchReclaimItems(IDs, signer.address))
+        .to.be.revertedWith("eesee: Caller is not the owner")
+        await expect(eesee.connect(signer).batchReclaimItems(IDs, signer.address))
+        .to.emit(eesee, "ReclaimItem")
+        .withArgs(2, anyValue, signer.address)
+        .and.to.emit(eesee, "ReclaimItem")
+        .withArgs(3, anyValue, signer.address)
+        .and.to.emit(eesee, "ReclaimItem")
+        .withArgs(4, anyValue, signer.address)
+    })
     //check item collection after deadline && buyTickets revert after deadline
 });
   
