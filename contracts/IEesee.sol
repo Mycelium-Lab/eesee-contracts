@@ -56,6 +56,12 @@ interface IEesee {
         bool tokensClaimed;
     }
 
+    struct Item {
+        NFT nft;
+        uint256 maxTickets;
+        uint256 ticketPrice;
+        uint256 duration;
+    }
     event ListItem(
         uint256 indexed ID,
         NFT indexed nft,

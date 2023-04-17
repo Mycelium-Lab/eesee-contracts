@@ -86,8 +86,14 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     // ============ External Methods ============
 
-    //TODO:batch list items
-
+    function batchListItems(Item[] memory items) external returns(uint256[] memory){
+        uint256[] memory IDs = new uint256[](items.length);
+        for(uint256 i = 0; i < items.length; i++) {
+            items[i].nft.token.safeTransferFrom(msg.sender, address(this), items[i].nft.tokenID);
+            IDs[i] = _listItem(items[i].nft, items[i].maxTickets, items[i].ticketPrice, items[i].duration);
+        }
+        return IDs;
+    }
     /**
      * @dev Lists NFT from sender's balance. Emits {ListItem} event.
      * @param nft - NFT to list. Note: The sender must have it approved for this contract.
