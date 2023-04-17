@@ -8,6 +8,7 @@ const hre = require("hardhat");
 
 async function main() {
     const { network } = hre
+
     const ESE = await hre.ethers.getContractFactory("ESE");
     const pool = await hre.ethers.getContractFactory("eeseePool");
     const eesee = await hre.ethers.getContractFactory("eesee");
@@ -19,7 +20,7 @@ async function main() {
     await _pool.deployed()
 
     let _eesee
-    if(network.tags.goerli){
+    if(network.name === 'goerli'){
         //goerli testnet
         _eesee = await eesee.deploy(
             _ESE.address, 
@@ -32,7 +33,7 @@ async function main() {
             3,//minimumRequestConfirmations
             50000//callbackGasLimit
         )
-    }else if(network.tags.mainnet){
+    }else if(network.name === 'ethereum'){
         _eesee = await eesee.deploy(
             _ESE.address, 
             _pool.address, 
@@ -44,7 +45,7 @@ async function main() {
             13,//minimumRequestConfirmations
             50000//callbackGasLimit
         )
-    }else if(network.tags.polygon){
+    }else if(network.name === 'polygon'){
         _eesee = await eesee.deploy(
             _ESE.address, 
             _pool.address, 
