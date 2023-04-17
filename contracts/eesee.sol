@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./eeseePool.sol";
 import "./IEesee.sol";
 
-//TODO: recheck everything + tests
 contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     using SafeERC20 for IERC20;
 

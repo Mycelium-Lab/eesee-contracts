@@ -5,7 +5,6 @@ pragma solidity 0.8.17;
 import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-//TODO: check ERC721A contract public functions for vulnerabilities
 contract eeseeNFT is ERC721A, Ownable {
     string public URI;
     constructor(string memory name, string memory symbol, string memory _URI) ERC721A(name, symbol) {

@@ -12,14 +12,14 @@ const {
     let mockVRF;
     let eesee;
     let NFT;
-    let signer, acc2, acc3, acc4, acc5, acc6, acc7, feeCollector;
+    let signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector;
     let ticketBuyers
     //after one year
     const timeNow = Math.round((new Date()).getTime() / 1000);
     const zeroAddress = "0x0000000000000000000000000000000000000000"
   
     this.beforeAll(async() => {
-        [signer, acc2, acc3, acc4, acc5, acc6, acc7, feeCollector] = await ethers.getSigners()
+        [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector] = await ethers.getSigners()
         ticketBuyers = [acc2,acc3, acc4, acc5, acc6,  acc7]
         const _ESE = await hre.ethers.getContractFactory("ESE");
         const _pool = await hre.ethers.getContractFactory("eeseePool");
@@ -60,6 +60,9 @@ const {
             await ESE.transfer(ticketBuyers[i].address, '10000000000000000000000')
             await ESE.connect(ticketBuyers[i]).approve(eesee.address, '10000000000000000000000')
         }
+
+        await ESE.transfer(acc8.address, '100000000000000000000')
+        await ESE.connect(acc8).approve(eesee.address, '100000000000000000000')
     })
 
     it('Lists NFT', async () => {
@@ -121,6 +124,68 @@ const {
         .and.to.emit(eesee, "ListItem")
         .withArgs(4, anyValue, signer.address, 200, 5, 86400)
     })
+
+    it('mints and lists NFT', async () => {
+        
+        let balanceBefore = await ESE.balanceOf(acc8.address)
+        await expect(eesee.connect(acc8).mintAndListItem(
+            50,
+            3,
+            86400,
+        ))
+        .to.emit(eesee, "ListItem")
+        .withArgs(5, anyValue, acc8.address, 50, 3, 86400)
+        let balanceAfter = await ESE.balanceOf(acc8.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+
+        balanceBefore = await ESE.balanceOf(acc8.address)
+        await expect(eesee.connect(acc8).mintAndListItems(
+            [50, 10, 66],
+            [3,4,5],
+            [86400, 86401, 86402],
+        ))
+        .to.emit(eesee, "ListItem")
+        .withArgs(6, anyValue, acc8.address, 50, 3, 86400)
+        .and.to.emit(eesee, "ListItem")
+        .withArgs(7, anyValue, acc8.address, 10, 4, 86401)
+        .and.to.emit(eesee, "ListItem")
+        .withArgs(8, anyValue, acc8.address, 66, 5, 86402)
+        balanceAfter = await ESE.balanceOf(acc8.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+
+        balanceBefore = await ESE.balanceOf(acc8.address)
+        await expect(eesee.connect(acc8).mintAndListItemWithDeploy(
+            "APES",
+            "bayc",
+            "/",
+            50,
+            3,
+            86400,
+        ))
+        .to.emit(eesee, "ListItem")
+        .withArgs(9, anyValue, acc8.address, 50, 3, 86400)
+        balanceAfter = await ESE.balanceOf(acc8.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+
+        balanceBefore = await ESE.balanceOf(acc8.address)
+        await expect(eesee.connect(acc8).mintAndListItemsWithDeploy(
+            "APES",
+            "bayc",
+            "/",
+            [50, 10, 66],
+            [3,4,5],
+            [86400, 86401, 86402],
+        ))
+        .to.emit(eesee, "ListItem")
+        .withArgs(10, anyValue, acc8.address, 50, 3, 86400)
+        .and.to.emit(eesee, "ListItem")
+        .withArgs(11, anyValue, acc8.address, 10, 4, 86401)
+        .and.to.emit(eesee, "ListItem")
+        .withArgs(12, anyValue, acc8.address, 66, 5, 86402)
+        balanceAfter = await ESE.balanceOf(acc8.address)
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), BigInt(await eesee.mintFee()), "Mint fee is correct")
+    })
+
     it('Buys tickets', async () => {
         const ID = 1
         await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWith("eesee: Amount must be above zero")
