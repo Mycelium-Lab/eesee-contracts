@@ -200,12 +200,38 @@ interface IEesee {
     function keyHash() external view returns(bytes32);
     function minimumRequestConfirmations() external view returns(uint16);
 
-    function listItem(NFT memory nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns(uint256 ID);
+    function listItem(
+        NFT memory nft, 
+        uint256 maxTickets, 
+        uint256 ticketPrice, 
+        uint256 duration
+    ) external returns(uint256 ID);
+    function listItems(
+        NFT[] memory nfts, 
+        uint256[] memory maxTickets, 
+        uint256[] memory ticketPrices, 
+        uint256[] memory durations
+    ) external returns(uint256[] memory IDs);
+
+    function mintAndListItem(
+        uint256 maxTickets, 
+        uint256 ticketPrice, 
+        uint256 duration
+    ) external returns(uint256 ID, uint256 tokenID);
     function mintAndListItems(
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices, 
         uint256[] memory durations
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs);
+
+    function mintAndListItemWithDeploy(
+        string memory name, 
+        string memory symbol, 
+        string memory baseURI, 
+        uint256 maxTickets, 
+        uint256 ticketPrice,
+        uint256 duration
+    ) external returns(uint256 ID, uint256 tokenID);
     function mintAndListItemsWithDeploy(
         string memory name, 
         string memory symbol, 

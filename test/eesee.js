@@ -90,27 +90,28 @@ const {
         assert.equal(listing.itemClaimed, false, "itemClaimed is correct")
         assert.equal(listing.tokensClaimed, false, "tokensClaimed is correct")
     })
+
     it('Batch lists NFT', async () => {
-        await expect(eesee.connect(signer).batchListItems(
+        await expect(eesee.connect(signer).listItems(
             [
-                {
-                    nft: { token: NFT.address, tokenID: 2 },
-                    maxTickets: 50,
-                    ticketPrice: 3,
-                    duration: 86400
-                },
-                {
-                    nft: { token: NFT.address, tokenID: 3 },
-                    maxTickets: 150,
-                    ticketPrice: 4,
-                    duration: 86400
-                },
-                {
-                    nft: { token: NFT.address, tokenID: 4 },
-                    maxTickets: 200,
-                    ticketPrice: 5,
-                    duration: 86400
-                }
+                { token: NFT.address, tokenID: 2 },
+                { token: NFT.address, tokenID: 3 },
+                { token: NFT.address, tokenID: 4 }
+            ],
+            [
+                50,
+                150,
+                200
+            ],
+            [
+                3,
+                4,
+                5
+            ],
+            [
+                86400,
+                86400,
+                86400
             ]
         ))
         .to.emit(eesee, "ListItem")
@@ -124,7 +125,6 @@ const {
         const ID = 1
         await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWith("eesee: Amount must be above zero")
         await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWith('eesee: Listing does not exist')
-        //await expect(eesee.connect(signer).buyTickets()).to.be.revertedWith('eesee: Listing has already expired')
         await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWith('eesee: Max tickets bought by this address')
 
         const balanceBefore = await ESE.balanceOf(acc2.address)
@@ -170,6 +170,16 @@ const {
 
             const listing = await eesee.listings(ID);
             assert.equal(listing.ticketsBought, (i + 1)*20, "ticketsBought is correct")
+
+            await expect(eesee.connect(ticketBuyers[i]).batchReceiveItems([ID], ticketBuyers[i].address))
+                .to.be.revertedWith("eesee: Caller is not the winner")
+            await expect(eesee.connect(ticketBuyers[i]).batchReceiveTokens([ID], ticketBuyers[i].address))
+                .to.be.revertedWith("eesee: Listing is not filfilled")
+
+            await expect(eesee.connect(signer).batchReclaimItems([ID], ticketBuyers[i].address))
+                .to.be.revertedWith("eesee: Listing has not expired yet")
+            await expect(eesee.connect(ticketBuyers[i]).batchReclaimTokens([ID], ticketBuyers[i].address))
+                .to.be.revertedWith("eesee: Listing has not expired yet")
 
             if(i == 4){
                 //MockVRF's first requestID is 0
@@ -233,6 +243,9 @@ const {
     })
     it('buyTickets reverts if listing is expired', async () => {
         const IDs = [2,3,4]
+
+        await eesee.connect(acc2).buyTickets(IDs[2], 20)
+
         const timestampBeforeTimeSkip = (await ethers.provider.getBlock()).timestamp
         await time.increase(86401)
         const timestampAfterTimeSkip = (await ethers.provider.getBlock()).timestamp
@@ -241,7 +254,6 @@ const {
         assert.equal((listing.creationTime.add(listing.duration)).lt(timestampAfterTimeSkip), true, "listing expired")
         await expect(eesee.connect(acc2).buyTickets(IDs[0], 20)).to.be.revertedWith("eesee: Listing has already expired")
         await expect(eesee.connect(acc2).buyTickets(IDs[1], 20)).to.be.revertedWith("eesee: Listing has already expired")
-        await expect(eesee.connect(acc2).buyTickets(IDs[2], 20)).to.be.revertedWith("eesee: Listing has already expired")
     })
     it('Can reclaim tokens if listing is expired', async () => {
         const expiredListingID = 2
@@ -261,7 +273,8 @@ const {
         .withArgs(3, anyValue, signer.address)
         .and.to.emit(eesee, "ReclaimItem")
         .withArgs(4, anyValue, signer.address)
+
+        await expect(eesee.connect(signer).batchReclaimItems([4], signer.address))
+            .to.be.revertedWith("eesee: Item has already been claimed")
     })
-    //check item collection after deadline && buyTickets revert after deadline
 });
-  

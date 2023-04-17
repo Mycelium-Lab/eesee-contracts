@@ -86,14 +86,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     // ============ External Methods ============
 
-    function batchListItems(Item[] memory items) external returns(uint256[] memory){
-        uint256[] memory IDs = new uint256[](items.length);
-        for(uint256 i = 0; i < items.length; i++) {
-            items[i].nft.token.safeTransferFrom(msg.sender, address(this), items[i].nft.tokenID);
-            IDs[i] = _listItem(items[i].nft, items[i].maxTickets, items[i].ticketPrice, items[i].duration);
-        }
-        return IDs;
-    }
     /**
      * @dev Lists NFT from sender's balance. Emits {ListItem} event.
      * @param nft - NFT to list. Note: The sender must have it approved for this contract.
@@ -106,6 +98,55 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     function listItem(NFT memory nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns(uint256 ID){
         nft.token.safeTransferFrom(msg.sender, address(this), nft.tokenID);
         ID = _listItem(nft, maxTickets, ticketPrice, duration);
+    }
+
+    /**
+     * @dev Lists NFTs from sender's balance. Emits {ListItem} events for each NFT listed.
+     * @param nfts - NFTs to list. Note: The sender must have them approved for this contract.
+     * @param maxTickets - Max amount of tickets that can be bought by participants.
+     * @param ticketPrices - Prices for a single ticket.
+     * @param durations - Durations of listings. Can be in range [minDuration, maxDuration].
+     
+     * @return IDs - IDs of listings created.
+     */
+    function listItems(
+        NFT[] memory nfts, 
+        uint256[] memory maxTickets, 
+        uint256[] memory ticketPrices, 
+        uint256[] memory durations
+    ) external returns(uint256[] memory IDs){
+        require(
+            nfts.length == maxTickets.length && maxTickets.length == ticketPrices.length && ticketPrices.length == durations.length, 
+            "eesee: Arrays don't match lengths"
+        );
+        IDs = new uint256[](nfts.length);
+        for(uint256 i = 0; i < nfts.length; i++) {
+            nfts[i].token.safeTransferFrom(msg.sender, address(this), nfts[i].tokenID);
+            IDs[i] = _listItem(nfts[i], maxTickets[i], ticketPrices[i], durations[i]);
+        }
+    }
+
+    /**
+     * @dev Mints NFT to {publicMinter} collection and lists it. Emits {ListItem} event.
+     * @param maxTickets - Max amounts of tickets that can be bought by participants.
+     * @param ticketPrice - Price for a single ticket.
+     * @param duration - Duration of listing. Can be in range [minDuration, maxDuration].
+     
+     * @return ID - ID of listing created.
+     * @return tokenID - ID of token that was minted.
+     * Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract
+     * Note The sender must have {mintFee} of ESE approved.
+     */
+    function mintAndListItem(
+        uint256 maxTickets, 
+        uint256 ticketPrice, 
+        uint256 duration
+    ) external returns(uint256 ID, uint256 tokenID){
+        _collectMintFee();
+        tokenID = publicMinter.nextTokenId();
+        publicMinter.mint(1);
+
+        ID = _listItem(NFT(IERC721(address(publicMinter)), tokenID), maxTickets, ticketPrice, duration);
     }
 
     /**
@@ -135,6 +176,37 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             tokenIDs[i] = i + startTokenId;
             IDs[i] = _listItem(NFT(IERC721(address(publicMinter)), tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
         }
+    }
+
+    /**
+     * @dev Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListItem} event.
+     * @param name - Name for a collection.
+     * @param symbol - Collection symbol.
+     * @param baseURI - URI to store NFT metadata in.
+     * @param maxTickets - Max amounts of tickets that can be bought by participants.
+     * @param ticketPrice - Price for a single ticket.
+     * @param duration - Duration of listing. Can be in range [minDuration, maxDuration].
+     
+     * @return ID - ID of listings created.
+     * @return tokenID - ID of tokens that were minted.
+     * Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract.
+     * Note The sender must have {mintFee} of ESE approved.
+     */
+    function mintAndListItemWithDeploy(
+        string memory name, 
+        string memory symbol, 
+        string memory baseURI, 
+        uint256 maxTickets, 
+        uint256 ticketPrice,
+        uint256 duration
+    ) external returns(uint256 ID, uint256 tokenID){
+        _collectMintFee();
+        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI);
+        NFTMinter.mint(1);
+        NFTMinter.renounceOwnership();
+
+        tokenID = NFTMinter.startTokenId();
+        ID = _listItem(NFT(IERC721(address(NFTMinter)), tokenID), maxTickets, ticketPrice, duration);
     }
 
     /**
@@ -397,8 +469,10 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     function _collectMintFee() internal {
-        ESE.safeTransferFrom(msg.sender, feeCollector, mintFee);
-        emit CollectDevFee(feeCollector, mintFee);
+        if(mintFee > 0){
+            ESE.safeTransferFrom(msg.sender, feeCollector, mintFee);
+            emit CollectDevFee(feeCollector, mintFee);
+        }
     }
 
     function _collectSellFees(uint256 amount, uint256 _devFee, uint256 _poolFee) internal returns(uint256 feeAmount){
