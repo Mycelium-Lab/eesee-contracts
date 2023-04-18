@@ -19,9 +19,9 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     ///@dev ESE token this contract uses.
     IERC20 public immutable ESE;
-    ///@dev Reward pool the fees are sent to.
-    address public immutable rewardPool;
     ///@dev Reward pool {poolFee} fees are sent to.
+    address public immutable rewardPool;
+    ///@dev The collection contract NFTs are minted to to save gas.
     eeseeNFT public immutable publicMinter;
 
     ///@dev Min and max durations for a listing.
