@@ -24,7 +24,7 @@ describe('eeseePool', function () {
         return proof
     }
     this.beforeAll(async() => {
-        [signer, acc2] = await ethers.getSigners()
+        [signer, acc2, claimerWallet] = await ethers.getSigners()
         
         const _ESE = await hre.ethers.getContractFactory('ESE');
         const _pool = await hre.ethers.getContractFactory('eeseePool');
@@ -35,7 +35,6 @@ describe('eeseePool', function () {
         pool = await _pool.deploy(ESE.address)
         await pool.deployed()
 
-
         for (let i = 0; i < 5; i ++) {
             let leaves = [];
             for (let j = 0; j < 10; j ++) {
@@ -44,18 +43,14 @@ describe('eeseePool', function () {
                 leaves.push([
                     wallet.address, randomInt
                 ])
-                if (i === 0 && j === 0) {
-                    claimerWallet = wallet
-                    claimerWalletBalances.push(randomInt)
-                }
             }
-            if (i !== 0) {
+            //if (i !== 0) {
                 let randomInt = getRandomInt(1, 1000000).toString()
                 leaves.push([
                     claimerWallet.address, randomInt
                 ])
                 claimerWalletBalances.push(randomInt)
-            }
+            //}
             leavesOfMerkleTrees.push(leaves)
             merkleTrees.push(StandardMerkleTree.of(leaves, ['address', 'uint256']))
         }
