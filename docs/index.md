@@ -249,10 +249,28 @@ function minimumRequestConfirmations() external view returns (uint16)
 function listItem(struct IEesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID)
 ```
 
+### listItems
+
+```solidity
+function listItems(struct IEesee.NFT[] nfts, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs)
+```
+
+### mintAndListItem
+
+```solidity
+function mintAndListItem(uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
+```
+
 ### mintAndListItems
 
 ```solidity
 function mintAndListItems(uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs, uint256[] tokenIDs)
+```
+
+### mintAndListItemWithDeploy
+
+```solidity
+function mintAndListItemWithDeploy(string name, string symbol, string baseURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
 ```
 
 ### mintAndListItemsWithDeploy
@@ -381,7 +399,7 @@ _ESE token this contract uses._
 address rewardPool
 ```
 
-_Reward pool the fees are sent to._
+_Reward pool {poolFee} fees are sent to._
 
 ### publicMinter
 
@@ -389,7 +407,7 @@ _Reward pool the fees are sent to._
 contract eeseeNFT publicMinter
 ```
 
-_Reward pool {poolFee} fees are sent to._
+_The collection contract NFTs are minted to to save gas._
 
 ### minDuration
 
@@ -491,12 +509,6 @@ _Chainlink VRF V2 request confirmations._
 constructor(contract IERC20 _ESE, address _rewardPool, string baseURI, address _feeCollector, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit) public
 ```
 
-### batchListItems
-
-```solidity
-function batchListItems(struct IEesee.Item[] items) external returns (uint256[])
-```
-
 ### listItem
 
 ```solidity
@@ -520,6 +532,52 @@ _Lists NFT from sender's balance. Emits {ListItem} event._
 | ---- | ---- | ----------- |
 | ID | uint256 | - ID of listing created. |
 
+### listItems
+
+```solidity
+function listItems(struct IEesee.NFT[] nfts, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs)
+```
+
+_Lists NFTs from sender's balance. Emits {ListItem} events for each NFT listed._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| nfts | struct IEesee.NFT[] | - NFTs to list. Note: The sender must have them approved for this contract. |
+| maxTickets | uint256[] | - Max amount of tickets that can be bought by participants. |
+| ticketPrices | uint256[] | - Prices for a single ticket. |
+| durations | uint256[] | - Durations of listings. Can be in range [minDuration, maxDuration]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| IDs | uint256[] | - IDs of listings created. |
+
+### mintAndListItem
+
+```solidity
+function mintAndListItem(uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
+```
+
+_Mints NFT to {publicMinter} collection and lists it. Emits {ListItem} event._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| maxTickets | uint256 | - Max amounts of tickets that can be bought by participants. |
+| ticketPrice | uint256 | - Price for a single ticket. |
+| duration | uint256 | - Duration of listing. Can be in range [minDuration, maxDuration]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ID | uint256 | - ID of listing created. |
+| tokenID | uint256 | - ID of token that was minted. Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract Note The sender must have {mintFee} of ESE approved. |
+
 ### mintAndListItems
 
 ```solidity
@@ -541,7 +599,33 @@ _Mints NFTs to {publicMinter} collection and lists them. Emits {ListItem} event 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | IDs | uint256[] | - IDs of listings created. |
-| tokenIDs | uint256[] | - IDs of tokens that were minted. Note This function costs less than mintAndListItemsWithDeploy() but does not deploy additional NFT collection contract Note The sender must have {mintFee} of ESE approved. |
+| tokenIDs | uint256[] | - IDs of tokens that were minted. Note This function costs less than mintAndListItemsWithDeploy() but does not deploy additional NFT collection contract Note The sender must have {mintFee} of ESE approved. |
+
+### mintAndListItemWithDeploy
+
+```solidity
+function mintAndListItemWithDeploy(string name, string symbol, string baseURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
+```
+
+_Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListItem} event._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| name | string | - Name for a collection. |
+| symbol | string | - Collection symbol. |
+| baseURI | string | - URI to store NFT metadata in. |
+| maxTickets | uint256 | - Max amounts of tickets that can be bought by participants. |
+| ticketPrice | uint256 | - Price for a single ticket. |
+| duration | uint256 | - Duration of listing. Can be in range [minDuration, maxDuration]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ID | uint256 | - ID of listings created. |
+| tokenID | uint256 | - ID of tokens that were minted. Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract. Note The sender must have {mintFee} of ESE approved. |
 
 ### mintAndListItemsWithDeploy
 
@@ -567,7 +651,7 @@ _Deploys new NFT collection contract, mints NFTs to it and lists them. Emits {Li
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | IDs | uint256[] | - IDs of listings created. |
-| tokenIDs | uint256[] | - IDs of tokens that were minted. Note: This is more expensive than mintAndListItems() function but it deploys additional NFT contract. Note The sender must have {mintFee} of ESE approved. |
+| tokenIDs | uint256[] | - IDs of tokens that were minted. Note: This is more expensive than mintAndListItems() function but it deploys additional NFT contract. Note The sender must have {mintFee} of ESE approved. |
 
 ### buyTickets
 
@@ -610,7 +694,7 @@ _Receive NFTs the sender won from listings. Emits {ReceiveItem} event for each o
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | tokens | contract IERC721[] | - Addresses of tokens received. |
-| tokenIDs | uint256[] | - IDs of tokens received. Note: Returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way |
+| tokenIDs | uint256[] | - IDs of tokens received. Note: Returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way |
 
 ### batchReceiveTokens
 
@@ -653,7 +737,7 @@ _Reclaim NFTs from expired listings. Emits {ReclaimItem} event for each listing 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | tokens | contract IERC721[] | - Addresses of tokens reclaimed. |
-| tokenIDs | uint256[] | - IDs of tokens reclaimed. Note: returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way |
+| tokenIDs | uint256[] | - IDs of tokens reclaimed. Note: returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way |
 
 ### batchReclaimTokens
 
@@ -777,7 +861,7 @@ _Changes minDuration. Emits {ChangeMinDuration} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _minDuration | uint256 | - New minDuration. Note: This function can only be called by owner. |
+| _minDuration | uint256 | - New minDuration. Note: This function can only be called by owner. |
 
 ### changeMaxDuration
 
@@ -791,7 +875,7 @@ _Changes maxDuration. Emits {ChangeMaxDuration} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _maxDuration | uint256 | - New maxDuration. Note: This function can only be called by owner. |
+| _maxDuration | uint256 | - New maxDuration. Note: This function can only be called by owner. |
 
 ### changeMaxTicketsBoughtByAddress
 
@@ -805,7 +889,7 @@ _Changes maxTicketsBoughtByAddress. Emits {ChangeMaxTicketsBoughtByAddress} even
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _maxTicketsBoughtByAddress | uint256 | - New maxTicketsBoughtByAddress. Note: This function can only be called by owner. |
+| _maxTicketsBoughtByAddress | uint256 | - New maxTicketsBoughtByAddress. Note: This function can only be called by owner. |
 
 ### changeMintFee
 
@@ -819,7 +903,7 @@ _Changes mintFee. Emits {ChangeMintFee} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _mintFee | uint256 | - New mintFee. Note: This function can only be called by owner. |
+| _mintFee | uint256 | - New mintFee. Note: This function can only be called by owner. |
 
 ### changeDevFee
 
@@ -833,7 +917,7 @@ _Changes devFee. Emits {ChangeDevFee} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _devFee | uint256 | - New devFee. Note: This function can only be called by owner. |
+| _devFee | uint256 | - New devFee. Note: This function can only be called by owner. |
 
 ### changePoolFee
 
@@ -847,7 +931,7 @@ _Changes poolFee. Emits {ChangePoolFee} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _poolFee | uint256 | - New poolFee. Note: This function can only be called by owner. |
+| _poolFee | uint256 | - New poolFee. Note: This function can only be called by owner. |
 
 ### changeFeeCollector
 
@@ -861,7 +945,7 @@ _Changes feeCollector. Emits {ChangeFeeCollector} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _feeCollector | address | - New feeCollector. Note: This function can only be called by owner. |
+| _feeCollector | address | - New feeCollector. Note: This function can only be called by owner. |
 
 ### fund
 
