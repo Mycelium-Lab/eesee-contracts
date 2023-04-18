@@ -28,7 +28,6 @@ struct Listing {
   uint256 creationTime;
   uint256 duration;
   address winner;
-  bool chainlinkRequestSent;
   bool itemClaimed;
   bool tokensClaimed;
 }
@@ -150,7 +149,7 @@ event ChangeFeeCollector(address previousFeeColector, address newFeeCollector)
 ### listings
 
 ```solidity
-function listings(uint256) external view returns (uint256 ID, struct IEesee.NFT nft, address owner, uint256 maxTickets, uint256 ticketPrice, uint256 ticketsBought, uint256 devFee, uint256 poolFee, uint256 creationTime, uint256 duration, address winner, bool chainlinkRequestSent, bool itemClaimed, bool tokensClaime)
+function listings(uint256) external view returns (uint256 ID, struct IEesee.NFT nft, address owner, uint256 maxTickets, uint256 ticketPrice, uint256 ticketsBought, uint256 devFee, uint256 poolFee, uint256 creationTime, uint256 duration, address winner, bool itemClaimed, bool tokensClaime)
 ```
 
 ### ESE

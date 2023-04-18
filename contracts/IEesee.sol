@@ -33,7 +33,6 @@ interface IEesee {
      * {creationTime} - Listing creation time.
      * {duration} - Listing duration.
      * {winner} - Selected winner.
-     * {chainlinkRequestSent} - Is Chainlink request sent for this listing.
      * {itemClaimed} - Is NFT claimed/reclaimed.
      * {tokensClaimed} - Are tokens claimed.
      */
@@ -51,7 +50,6 @@ interface IEesee {
         uint256 creationTime;
         uint256 duration;
         address winner;
-        bool chainlinkRequestSent;
         bool itemClaimed;
         bool tokensClaimed;
     }
@@ -177,7 +175,6 @@ interface IEesee {
         uint256 creationTime,
         uint256 duration,
         address winner,
-        bool chainlinkRequestSent,
         bool itemClaimed,
         bool tokensClaime
     );

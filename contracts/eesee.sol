@@ -275,7 +275,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         require(listing.ticketsBought <= listing.maxTickets, "eesee: All tickets bought");
 
         if(listing.ticketsBought == listing.maxTickets){
-            listing.chainlinkRequestSent = true;
             uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
             chainlinkRequestIDs[requestID] = ID;
             emit RequestWords(ID, requestID);
@@ -362,8 +361,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             Listing storage listing = listings[ID];
             require(msg.sender == listing.owner, "eesee: Caller is not the owner");
             require(block.timestamp > listing.creationTime + listing.duration, "eesee: Listing has not expired yet");
-            require(!listing.chainlinkRequestSent, "eesee: Listing fulfilment is already pending");
             require(!listing.itemClaimed, "eesee: Item has already been claimed");
+            require(listing.winner == address(0), "eesee: Listing is already filfilled");
 
             tokens[i] = listing.nft.token;
             tokenIDs[i] = listing.nft.tokenID;
@@ -392,7 +391,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             uint256 ticketsBoughtByAddress = listing.ticketsBoughtByAddress[msg.sender];
             require(ticketsBoughtByAddress > 0, "eesee: No tickets bought");
             require(block.timestamp > listing.creationTime + listing.duration, "eesee: Listing has not expired yet");
-            require(!listing.chainlinkRequestSent, "eesee: Listing fulfilment is already pending");
+            require(listing.winner == address(0), "eesee: Listing is already filfilled");
 
             listing.ticketsBought -= ticketsBoughtByAddress;
             listing.ticketsBoughtByAddress[msg.sender] = 0;
@@ -498,6 +497,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     function fulfillRandomWords(uint256 requestID, uint256[] memory randomWords) internal override {
         uint256 ID = chainlinkRequestIDs[requestID];
         Listing storage listing = listings[ID];
+
+        require(block.timestamp <= listing.creationTime + listing.duration, "eesee: Listing has already expired");
 
         uint256 chosenTicket = randomWords[0] % listing.maxTickets;
         listing.winner = listing.ticketIDBuyer[chosenTicket];

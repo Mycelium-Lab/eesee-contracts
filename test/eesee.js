@@ -89,7 +89,6 @@ const {
         //assert.equal(listing.creationTime, timeNow, "creationTime is correct")
         assert.equal(listing.duration, 86400, "duration is correct")
         assert.equal(listing.winner, zeroAddress, "winner is correct")
-        assert.equal(listing.chainlinkRequestSent, false, "chainlinkRequestSent is correct")
         assert.equal(listing.itemClaimed, false, "itemClaimed is correct")
         assert.equal(listing.tokensClaimed, false, "tokensClaimed is correct")
     })
@@ -274,7 +273,6 @@ const {
             if(i == 4){
                 //MockVRF's first requestID is 0
                 await recipt.to.emit(eesee, "RequestWords").withArgs(ID, 0)
-                assert.equal(listing.chainlinkRequestSent, true, "chainlinkRequestSent is correct")
             }
         }
 
@@ -313,7 +311,6 @@ const {
         listing = await eesee.listings(ID)
         assert.equal(listing.itemClaimed, true, "itemClaimed is correct")
         assert.equal(listing.tokensClaimed, false, "tokensClaimed is correct")
-        assert.equal(listing.chainlinkRequestSent, true, "chainlinkRequestSent is correct")
         const owner = await NFT.ownerOf(ID)
         assert.equal(owner, listing.winner, "new owner of NFT is correct")
         await expect(eesee.connect(winnerAcc).batchReceiveItems([ID], listing.winner))
