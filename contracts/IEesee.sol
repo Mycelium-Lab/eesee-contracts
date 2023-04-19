@@ -143,11 +143,6 @@ interface IEesee {
         uint256 indexed newMaxTicketsBoughtByAddress
     );
 
-    event ChangeMintFee(
-        uint256 indexed previousMintFee, 
-        uint256 indexed newMintFee
-    );
-
     event ChangeDevFee(
         uint256 indexed previousDevFee, 
         uint256 indexed newDevFee
@@ -186,7 +181,6 @@ interface IEesee {
     function minDuration() external view returns(uint256);
     function maxDuration() external view returns(uint256);
     function maxTicketsBoughtByAddress() external view returns(uint256);
-    function mintFee() external view returns(uint256);
     function devFee() external view returns(uint256);
     function poolFee() external view returns(uint256);
     function feeCollector() external view returns(address);
@@ -253,7 +247,6 @@ interface IEesee {
     function changeMinDuration(uint256 _minDuration) external;
     function changeMaxDuration(uint256 _maxDuration) external;
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external;
-    function changeMintFee(uint256 _mintFee) external;
     function changeDevFee(uint256 _devFee) external;
     function changePoolFee(uint256 _poolFee) external;
     function changeFeeCollector(address _feeCollector) external;

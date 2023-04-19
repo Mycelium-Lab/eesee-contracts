@@ -30,8 +30,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     ///@dev Max tickets bought by a single address in a single listing. [1 ether == 100%]
     //Note: Users can still buy 1 ticket even if this check fails. e.g. there is a listing with only 2 tickets and this is set to 20%.
     uint256 public maxTicketsBoughtByAddress = 0.20 ether;
-    ///@dev Fixed fee that is collected if NFT is minted using this contract.
-    uint256 public mintFee = 10 ether;
     ///@dev Fee that is collected to {feeCollector} from each fulfilled listing. [1 ether == 100%]
     uint256 public devFee = 0.02 ether;
     ///@dev Fee that is collected to {rewardPool} from each fulfilled listing. [1 ether == 100%]
@@ -134,14 +132,12 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return ID - ID of listing created.
      * @return tokenID - ID of token that was minted.
      * Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract
-     * Note The sender must have {mintFee} of ESE approved.
      */
     function mintAndListItem(
         uint256 maxTickets, 
         uint256 ticketPrice, 
         uint256 duration
     ) external returns(uint256 ID, uint256 tokenID){
-        _collectMintFee();
         tokenID = publicMinter.nextTokenId();
         publicMinter.mint(1);
 
@@ -157,7 +153,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return IDs - IDs of listings created.
      * @return tokenIDs - IDs of tokens that were minted.
      * Note This function costs less than mintAndListItemsWithDeploy() but does not deploy additional NFT collection contract
-     * Note The sender must have {mintFee} of ESE approved.
      */
     function mintAndListItems(
         uint256[] memory maxTickets, 
@@ -165,7 +160,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256[] memory durations
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        _collectMintFee();
         uint256 startTokenId = publicMinter.nextTokenId();
         publicMinter.mint(maxTickets.length);
 
@@ -189,7 +183,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return ID - ID of listings created.
      * @return tokenID - ID of tokens that were minted.
      * Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract.
-     * Note The sender must have {mintFee} of ESE approved.
      */
     function mintAndListItemWithDeploy(
         string memory name, 
@@ -199,7 +192,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256 ticketPrice,
         uint256 duration
     ) external returns(uint256 ID, uint256 tokenID){
-        _collectMintFee();
         eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI);
         NFTMinter.mint(1);
         NFTMinter.renounceOwnership();
@@ -220,7 +212,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return IDs - IDs of listings created.
      * @return tokenIDs - IDs of tokens that were minted.
      * Note: This is more expensive than mintAndListItems() function but it deploys additional NFT contract.
-     * Note The sender must have {mintFee} of ESE approved.
      */
     function mintAndListItemsWithDeploy(
         string memory name, 
@@ -231,7 +222,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256[] memory durations
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        _collectMintFee();
         eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI);
         NFTMinter.mint(maxTickets.length);
         NFTMinter.renounceOwnership();
@@ -466,13 +456,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         emit ListItem(ID, nft, listing.owner, maxTickets, ticketPrice, duration);
     }
 
-    function _collectMintFee() internal {
-        if(mintFee > 0){
-            ESE.safeTransferFrom(msg.sender, feeCollector, mintFee);
-            emit CollectDevFee(feeCollector, mintFee);
-        }
-    }
-
     function _collectSellFees(uint256 amount, uint256 _devFee, uint256 _poolFee) internal returns(uint256 feeAmount){
         uint256 devFeeAmount = amount * _devFee / 1 ether;
         if(devFeeAmount > 0){
@@ -539,16 +522,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
         emit ChangeMaxTicketsBoughtByAddress(maxTicketsBoughtByAddress, _maxTicketsBoughtByAddress);
         maxTicketsBoughtByAddress = _maxTicketsBoughtByAddress;
-    }
-
-    /**
-     * @dev Changes mintFee. Emits {ChangeMintFee} event.
-     * @param _mintFee - New mintFee.
-     * Note: This function can only be called by owner.
-     */
-    function changeMintFee(uint256 _mintFee) external onlyOwner {
-        emit ChangeMintFee(mintFee, _mintFee);
-        mintFee = _mintFee;
     }
 
     /**

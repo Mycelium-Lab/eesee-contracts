@@ -125,10 +125,6 @@ const {
     })
 
     it('mints and lists NFT', async () => {
-        const fee = BigInt(await eesee.mintFee())
-
-        let feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
-        let balanceBefore = await ESE.balanceOf(acc8.address)
         await expect(eesee.connect(acc8).mintAndListItem(
             50,
             3,
@@ -136,16 +132,8 @@ const {
         ))
         .to.emit(eesee, "ListItem")
         .withArgs(5, anyValue, acc8.address, 50, 3, 86400)
-        .and.to.emit(eesee, "CollectDevFee")
-        .withArgs(feeCollector.address, fee)
 
-        let feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
-        let balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
-        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
-
-        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
-        balanceBefore = await ESE.balanceOf(acc8.address)
+        
         await expect(eesee.connect(acc8).mintAndListItems(
             [50, 10, 66],
             [3,4,5],
@@ -157,16 +145,7 @@ const {
         .withArgs(7, anyValue, acc8.address, 10, 4, 86401)
         .and.to.emit(eesee, "ListItem")
         .withArgs(8, anyValue, acc8.address, 66, 5, 86402)
-        .and.to.emit(eesee, "CollectDevFee")
-        .withArgs(feeCollector.address, fee)
 
-        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
-        balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
-        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
-
-        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
-        balanceBefore = await ESE.balanceOf(acc8.address)
         await expect(eesee.connect(acc8).mintAndListItemWithDeploy(
             "APES",
             "bayc",
@@ -177,16 +156,7 @@ const {
         ))
         .to.emit(eesee, "ListItem")
         .withArgs(9, anyValue, acc8.address, 50, 3, 86400)
-        .and.to.emit(eesee, "CollectDevFee")
-        .withArgs(feeCollector.address, fee)
 
-        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
-        balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
-        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
-
-        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
-        balanceBefore = await ESE.balanceOf(acc8.address)
         await expect(eesee.connect(acc8).mintAndListItemsWithDeploy(
             "APES",
             "bayc",
@@ -201,13 +171,6 @@ const {
         .withArgs(11, anyValue, acc8.address, 10, 4, 86401)
         .and.to.emit(eesee, "ListItem")
         .withArgs(12, anyValue, acc8.address, 66, 5, 86402)
-        .and.to.emit(eesee, "CollectDevFee")
-        .withArgs(feeCollector.address, fee)
-        
-        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
-        balanceAfter = await ESE.balanceOf(acc8.address)
-        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), fee, "Mint fee is correct")
-        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), fee, "Mint fee is correct")
     })
 
     it('Buys tickets', async () => {
@@ -408,13 +371,6 @@ const {
         .to.emit(eesee, "ChangeMaxTicketsBoughtByAddress")
         .withArgs(maxTicketsBoughtByAddress, newValue)
         assert.equal(newValue, await eesee.maxTicketsBoughtByAddress(), "maxTicketsBoughtByAddress has changed")
-
-        const mintFee = await eesee.mintFee() 
-        await expect(eesee.connect(acc2).changeMintFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
-        await expect(eesee.connect(signer).changeMintFee(newValue))
-        .to.emit(eesee, "ChangeMintFee")
-        .withArgs(mintFee, newValue)
-        assert.equal(newValue, await eesee.mintFee(), "mintFee has changed")
 
         const devFee = await eesee.devFee() 
         await expect(eesee.connect(acc2).changeDevFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")

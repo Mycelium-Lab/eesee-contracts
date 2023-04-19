@@ -122,12 +122,6 @@ event ChangeMaxDuration(uint256 previousMaxDuration, uint256 newMaxDuration)
 event ChangeMaxTicketsBoughtByAddress(uint256 previousMaxTicketsBoughtByAddress, uint256 newMaxTicketsBoughtByAddress)
 ```
 
-### ChangeMintFee
-
-```solidity
-event ChangeMintFee(uint256 previousMintFee, uint256 newMintFee)
-```
-
 ### ChangeDevFee
 
 ```solidity
@@ -186,12 +180,6 @@ function maxDuration() external view returns (uint256)
 
 ```solidity
 function maxTicketsBoughtByAddress() external view returns (uint256)
-```
-
-### mintFee
-
-```solidity
-function mintFee() external view returns (uint256)
 ```
 
 ### devFee
@@ -344,12 +332,6 @@ function changeMaxDuration(uint256 _maxDuration) external
 function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external
 ```
 
-### changeMintFee
-
-```solidity
-function changeMintFee(uint256 _mintFee) external
-```
-
 ### changeDevFee
 
 ```solidity
@@ -429,14 +411,6 @@ uint256 maxTicketsBoughtByAddress
 ```
 
 _Max tickets bought by a single address in a single listing. [1 ether == 100%]_
-
-### mintFee
-
-```solidity
-uint256 mintFee
-```
-
-_Fixed fee that is collected if NFT is minted using this contract._
 
 ### devFee
 
@@ -575,7 +549,7 @@ _Mints NFT to {publicMinter} collection and lists it. Emits {ListItem} event._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | ID | uint256 | - ID of listing created. |
-| tokenID | uint256 | - ID of token that was minted. Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract Note The sender must have {mintFee} of ESE approved. |
+| tokenID | uint256 | - ID of token that was minted. Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract |
 
 ### mintAndListItems
 
@@ -598,7 +572,7 @@ _Mints NFTs to {publicMinter} collection and lists them. Emits {ListItem} event 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | IDs | uint256[] | - IDs of listings created. |
-| tokenIDs | uint256[] | - IDs of tokens that were minted. Note This function costs less than mintAndListItemsWithDeploy() but does not deploy additional NFT collection contract Note The sender must have {mintFee} of ESE approved. |
+| tokenIDs | uint256[] | - IDs of tokens that were minted. Note This function costs less than mintAndListItemsWithDeploy() but does not deploy additional NFT collection contract |
 
 ### mintAndListItemWithDeploy
 
@@ -624,7 +598,7 @@ _Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListI
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | ID | uint256 | - ID of listings created. |
-| tokenID | uint256 | - ID of tokens that were minted. Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract. Note The sender must have {mintFee} of ESE approved. |
+| tokenID | uint256 | - ID of tokens that were minted. Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract. |
 
 ### mintAndListItemsWithDeploy
 
@@ -650,7 +624,7 @@ _Deploys new NFT collection contract, mints NFTs to it and lists them. Emits {Li
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | IDs | uint256[] | - IDs of listings created. |
-| tokenIDs | uint256[] | - IDs of tokens that were minted. Note: This is more expensive than mintAndListItems() function but it deploys additional NFT contract. Note The sender must have {mintFee} of ESE approved. |
+| tokenIDs | uint256[] | - IDs of tokens that were minted. Note: This is more expensive than mintAndListItems() function but it deploys additional NFT contract. |
 
 ### buyTickets
 
@@ -821,12 +795,6 @@ _Get the amount of tickets bought by address in listing._
 function _listItem(struct IEesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) internal returns (uint256 ID)
 ```
 
-### _collectMintFee
-
-```solidity
-function _collectMintFee() internal
-```
-
 ### _collectSellFees
 
 ```solidity
@@ -889,20 +857,6 @@ _Changes maxTicketsBoughtByAddress. Emits {ChangeMaxTicketsBoughtByAddress} even
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | _maxTicketsBoughtByAddress | uint256 | - New maxTicketsBoughtByAddress. Note: This function can only be called by owner. |
-
-### changeMintFee
-
-```solidity
-function changeMintFee(uint256 _mintFee) external
-```
-
-_Changes mintFee. Emits {ChangeMintFee} event._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _mintFee | uint256 | - New mintFee. Note: This function can only be called by owner. |
 
 ### changeDevFee
 
