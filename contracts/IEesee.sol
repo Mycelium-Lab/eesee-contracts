@@ -226,7 +226,9 @@ interface IEesee {
     function mintAndListItemsWithDeploy(
         string memory name, 
         string memory symbol, 
-        string memory baseURI, 
+        string memory baseURI,
+        string memory contractURI, 
+        uint96 royaltyFeesInBips,
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices, 
         uint256[] memory durations

@@ -8,10 +8,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./eeseePool.sol";
 import "./IEesee.sol";
+import "./IRoyaltyEngineV1.sol";
 
 contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     using SafeERC20 for IERC20;
-
     ///@dev An array of all existing listings.
     Listing[] public listings;
     ///@dev Maps chainlink request ID to listing ID.
@@ -50,10 +50,21 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
     uint32 immutable private callbackGasLimit;
 
+    // mainnet
+    // address private constant ROYALTY_ENGINE_ADDRESS = 0x0385603ab55642cb4Dd5De3aE9e306809991804f;
+    // polygon
+    // address private constant ROYALTY_ENGINE_ADDRESS = 0x28EdFcF0Be7E86b07493466e7631a213bDe8eEF2;
+    // BSC & AVALANCHE
+    // address private constant ROYALTY_ENGINE_ADDRESS = 0xEF770dFb6D5620977213f55f99bfd781D04BBE15
+    
+    IRoyaltyEngineV1 private royaltyEngine;
+
     constructor(
         IERC20 _ESE,
         address _rewardPool,
         string memory baseURI,
+        string memory contractURI,
+        address _royaltyEngine,
         address _feeCollector,
         address _vrfCoordinator, 
         LinkTokenInterface _LINK,
@@ -64,7 +75,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         ESE = _ESE;
         rewardPool = _rewardPool;
         // Deploy NFT contract for mintAndListItems() function that mints NFTs to existing collection
-        publicMinter = new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI);
+        publicMinter = new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI, contractURI, 0);
 
         feeCollector = _feeCollector;
 
@@ -76,6 +87,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         keyHash = _keyHash;
         minimumRequestConfirmations = _minimumRequestConfirmations;
         callbackGasLimit = _callbackGasLimit;
+
+        royaltyEngine = IRoyaltyEngineV1(_royaltyEngine);
 
         //Create dummy listing at index 0
         listings.push();
@@ -217,12 +230,15 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         string memory name, 
         string memory symbol, 
         string memory baseURI, 
+        string memory contractURI,
+        uint96 royaltyFeesInBips,
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices,
         uint256[] memory durations
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI);
+        _collectMintFee();
+        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI, contractURI, royaltyFeesInBips);
         NFTMinter.mint(maxTickets.length);
         NFTMinter.renounceOwnership();
 
@@ -455,7 +471,13 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
         emit ListItem(ID, nft, listing.owner, maxTickets, ticketPrice, duration);
     }
-
+    function _collectRoyalties(address tokenAddress, uint256 tokenId, uint256 value) internal returns(uint256 royaltyAmount) {
+        (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(tokenAddress, tokenId, value);
+        for(uint256 i = 0; i < recipients.length; i++){ 
+            recipients[i].transfer(amounts[i]);
+            royaltyAmount += amounts[i];
+        }
+    }
     function _collectSellFees(uint256 amount, uint256 _devFee, uint256 _poolFee) internal returns(uint256 feeAmount){
         uint256 devFeeAmount = amount * _devFee / 1 ether;
         if(devFeeAmount > 0){
