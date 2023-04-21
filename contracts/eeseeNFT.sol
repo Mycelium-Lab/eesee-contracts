@@ -5,9 +5,10 @@ pragma solidity 0.8.17;
 import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
+import "operator-filter-registry/src/DefaultOperatorFilterer.sol";
 
 //TODO: check ERC721A contract public functions for vulnerabilities
-contract eeseeNFT is ERC721A, ERC2981, Ownable {
+contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     string public URI;
     
     // opensea royalty and nft collection info
@@ -32,7 +33,9 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable {
     function mint(uint256 quantity) external onlyOwner {
         _safeMint(msg.sender, quantity);
     }
-    
+    function setRoyaltyForTokenID(uint256 tokenId, address receiver, uint96 feeNumerator) public onlyOwner {
+        _setTokenRoyalty(tokenId, receiver, feeNumerator);
+    }
     function supportsInterface(bytes4 interfaceId)
             public
             view
@@ -56,6 +59,28 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable {
     function _baseURI() internal view override returns (string memory) {
         return URI;
     }
+    function setApprovalForAll(address operator, bool approved) public override onlyAllowedOperatorApproval(operator) {
+        super.setApprovalForAll(operator, approved);
+    }
 
-    //TODO:royalty like opensea!!!
+    function approve(address operator, uint256 tokenId) payable public override onlyAllowedOperatorApproval(operator) {
+        super.approve(operator, tokenId);
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) payable public override onlyAllowedOperator(from) {
+        super.transferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) payable public override onlyAllowedOperator(from) {
+        super.safeTransferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data)
+        payable
+        public
+        override
+        onlyAllowedOperator(from)
+    {
+        super.safeTransferFrom(from, to, tokenId, data);
+    }
 }

@@ -116,7 +116,10 @@ interface IEesee {
         uint256 amount
     );
 
-
+    event CollectRoyalties(
+        address payable[] recipients,
+        uint256[] amounts
+    );
     event CollectDevFee(
         address indexed to,
         uint256 amount
@@ -207,18 +210,22 @@ interface IEesee {
     function mintAndListItem(
         uint256 maxTickets, 
         uint256 ticketPrice, 
-        uint256 duration
+        uint256 duration,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256 ID, uint256 tokenID);
     function mintAndListItems(
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices, 
-        uint256[] memory durations
+        uint256[] memory durations,
+        uint96[] memory royaltyFeeNumerators
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs);
 
     function mintAndListItemWithDeploy(
         string memory name, 
         string memory symbol, 
-        string memory baseURI, 
+        string memory baseURI,
+        string memory contractURI,
+        uint96 royaltyFeesInBips,
         uint256 maxTickets, 
         uint256 ticketPrice,
         uint256 duration

@@ -149,11 +149,12 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     function mintAndListItem(
         uint256 maxTickets, 
         uint256 ticketPrice, 
-        uint256 duration
+        uint256 duration,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256 ID, uint256 tokenID){
         tokenID = publicMinter.nextTokenId();
         publicMinter.mint(1);
-
+        publicMinter.setRoyaltyForTokenID(tokenID, msg.sender, royaltyFeeNumerator);
         ID = _listItem(NFT(IERC721(address(publicMinter)), tokenID), maxTickets, ticketPrice, duration);
     }
 
@@ -170,7 +171,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     function mintAndListItems(
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices, 
-        uint256[] memory durations
+        uint256[] memory durations,
+        uint96[] memory royaltyFeeNumerators
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
         uint256 startTokenId = publicMinter.nextTokenId();
@@ -180,6 +182,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         tokenIDs = new uint256[](maxTickets.length);
         for(uint256 i; i < maxTickets.length; i++){
             tokenIDs[i] = i + startTokenId;
+            publicMinter.setRoyaltyForTokenID(tokenIDs[i], msg.sender, royaltyFeeNumerators[i]);
             IDs[i] = _listItem(NFT(IERC721(address(publicMinter)), tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
         }
     }
@@ -201,11 +204,13 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         string memory name, 
         string memory symbol, 
         string memory baseURI, 
+        string memory contractURI,
+        uint96 royaltyFeeNumerator,
         uint256 maxTickets, 
         uint256 ticketPrice,
         uint256 duration
     ) external returns(uint256 ID, uint256 tokenID){
-        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI);
+        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI, contractURI, royaltyFeeNumerator);
         NFTMinter.mint(1);
         NFTMinter.renounceOwnership();
 
@@ -231,14 +236,13 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         string memory symbol, 
         string memory baseURI, 
         string memory contractURI,
-        uint96 royaltyFeesInBips,
+        uint96 royaltyFeeNumerator,
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices,
         uint256[] memory durations
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        _collectMintFee();
-        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI, contractURI, royaltyFeesInBips);
+        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI, contractURI, royaltyFeeNumerator);
         NFTMinter.mint(maxTickets.length);
         NFTMinter.renounceOwnership();
 
@@ -337,6 +341,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
             _amount -= _collectSellFees(_amount, listing.devFee, listing.poolFee);
+            _amount -= _collectRoyalties(address(listing.nft.token), listing.nft.tokenID, _amount);
             amount += _amount;
 
             emit ReceiveTokens(ID, recipient, _amount);
@@ -471,12 +476,13 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
         emit ListItem(ID, nft, listing.owner, maxTickets, ticketPrice, duration);
     }
-    function _collectRoyalties(address tokenAddress, uint256 tokenId, uint256 value) internal returns(uint256 royaltyAmount) {
-        (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(tokenAddress, tokenId, value);
-        for(uint256 i = 0; i < recipients.length; i++){ 
-            recipients[i].transfer(amounts[i]);
+    function _collectRoyalties(address tokenAddress, uint256 tokenID, uint256 value) internal returns(uint256 royaltyAmount) {
+        (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(tokenAddress, tokenID, value);
+        for(uint256 i = 0; i < recipients.length; i++){
+            ESE.safeTransfer(recipients[i], amounts[i]);
             royaltyAmount += amounts[i];
         }
+        emit CollectRoyalties(recipients, amounts);
     }
     function _collectSellFees(uint256 amount, uint256 _devFee, uint256 _poolFee) internal returns(uint256 feeAmount){
         uint256 devFeeAmount = amount * _devFee / 1 ether;
@@ -513,7 +519,9 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     // ============ Admin Methods ============
-
+     function changeRoyaltyEngine(address _royaltyEngine) external onlyOwner {
+        royaltyEngine = IRoyaltyEngineV1(_royaltyEngine);
+     }
     /**
      * @dev Changes minDuration. Emits {ChangeMinDuration} event.
      * @param _minDuration - New minDuration.
