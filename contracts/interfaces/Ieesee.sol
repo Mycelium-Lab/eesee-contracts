@@ -5,9 +5,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
-import "./eeseeNFT.sol";
+import "./IeeseeNFTMinter.sol";
+import "./IRoyaltyEngineV1.sol";
 
-interface IEesee {
+interface Ieesee {
     /**
      * @dev NFT:
      * {token} - IERC721 contract address.
@@ -116,10 +117,12 @@ interface IEesee {
         uint256 amount
     );
 
-    event CollectRoyalties(
-        address payable[] recipients,
-        uint256[] amounts
+
+    event CollectRoyalty(
+        address indexed recipient,
+        uint256 amount
     );
+
     event CollectDevFee(
         address indexed to,
         uint256 amount
@@ -130,6 +133,11 @@ interface IEesee {
         uint256 amount
     );
 
+
+    event ChangeMinter(
+        IeeseeNFTMinter indexed previousMinter, 
+        IeeseeNFTMinter indexed newMinter
+    );
 
     event ChangeMinDuration(
         uint256 indexed previousMinDuration,
@@ -179,7 +187,7 @@ interface IEesee {
 
     function ESE() external view returns(IERC20);
     function rewardPool() external view returns(address);
-    function publicMinter() external view returns(eeseeNFT);
+    function minter() external view returns(IeeseeNFTMinter);
 
     function minDuration() external view returns(uint256);
     function maxDuration() external view returns(uint256);
@@ -208,37 +216,43 @@ interface IEesee {
     ) external returns(uint256[] memory IDs);
 
     function mintAndListItem(
+        string memory tokenURI, 
         uint256 maxTickets, 
         uint256 ticketPrice, 
         uint256 duration,
+        address royaltyReceiver,
         uint96 royaltyFeeNumerator
     ) external returns(uint256 ID, uint256 tokenID);
     function mintAndListItems(
+        string[] memory tokenURIs, 
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices, 
         uint256[] memory durations,
-        uint96[] memory royaltyFeeNumerators
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs);
 
     function mintAndListItemWithDeploy(
         string memory name, 
         string memory symbol, 
-        string memory baseURI,
+        string memory baseURI, 
         string memory contractURI,
-        uint96 royaltyFeesInBips,
         uint256 maxTickets, 
         uint256 ticketPrice,
-        uint256 duration
+        uint256 duration,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256 ID, uint256 tokenID);
     function mintAndListItemsWithDeploy(
         string memory name, 
         string memory symbol, 
-        string memory baseURI,
-        string memory contractURI, 
-        uint96 royaltyFeesInBips,
+        string memory baseURI, 
+        string memory contractURI,
         uint256[] memory maxTickets, 
-        uint256[] memory ticketPrices, 
-        uint256[] memory durations
+        uint256[] memory ticketPrices,
+        uint256[] memory durations,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs);
 
     function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent);

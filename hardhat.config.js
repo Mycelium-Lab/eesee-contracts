@@ -1,10 +1,14 @@
 require("@nomicfoundation/hardhat-toolbox");
 require('solidity-docgen')
 require('dotenv').config()
+require("hardhat-contract-sizer");
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   etherscan: {
     apiKey: process.env.ETHERSCAN,
+  },
+  contractSizer: {
+    runOnCompile: true,
   },
   networks: {
     testnet: {
@@ -32,7 +36,7 @@ module.exports = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 1000,
+        runs: 1,
       },
     },
   },

@@ -2,15 +2,12 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./eeseePool.sol";
-import "./IEesee.sol";
-import "./IRoyaltyEngineV1.sol";
+import "./interfaces/Ieesee.sol";
 
-contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
+contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     using SafeERC20 for IERC20;
     ///@dev An array of all existing listings.
     Listing[] public listings;
@@ -21,8 +18,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     IERC20 public immutable ESE;
     ///@dev Reward pool {poolFee} fees are sent to.
     address public immutable rewardPool;
-    ///@dev The collection contract NFTs are minted to to save gas.
-    eeseeNFT public immutable publicMinter;
+    ///@dev Contract that mints NFTs
+    IeeseeNFTMinter public minter;
 
     ///@dev Min and max durations for a listing.
     uint256 public minDuration = 1 days;
@@ -50,22 +47,15 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
     uint32 immutable private callbackGasLimit;
 
-    // mainnet
-    // address private constant ROYALTY_ENGINE_ADDRESS = 0x0385603ab55642cb4Dd5De3aE9e306809991804f;
-    // polygon
-    // address private constant ROYALTY_ENGINE_ADDRESS = 0x28EdFcF0Be7E86b07493466e7631a213bDe8eEF2;
-    // BSC & AVALANCHE
-    // address private constant ROYALTY_ENGINE_ADDRESS = 0xEF770dFb6D5620977213f55f99bfd781D04BBE15
-    
-    IRoyaltyEngineV1 private royaltyEngine;
+    ///@dev The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract.
+    IRoyaltyEngineV1 immutable private royaltyEngine;
 
     constructor(
         IERC20 _ESE,
         address _rewardPool,
-        string memory baseURI,
-        string memory contractURI,
-        address _royaltyEngine,
+        IeeseeNFTMinter _minter,
         address _feeCollector,
+        IRoyaltyEngineV1 _royaltyEngine,
         address _vrfCoordinator, 
         LinkTokenInterface _LINK,
         bytes32 _keyHash,
@@ -74,10 +64,9 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     ) VRFConsumerBaseV2(_vrfCoordinator) {
         ESE = _ESE;
         rewardPool = _rewardPool;
-        // Deploy NFT contract for mintAndListItems() function that mints NFTs to existing collection
-        publicMinter = new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI, contractURI, 0);
-
+        minter = _minter;
         feeCollector = _feeCollector;
+        royaltyEngine = _royaltyEngine;
 
         // ChainLink stuff. Create subscription for VRF V2.
         vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
@@ -87,8 +76,6 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         keyHash = _keyHash;
         minimumRequestConfirmations = _minimumRequestConfirmations;
         callbackGasLimit = _callbackGasLimit;
-
-        royaltyEngine = IRoyaltyEngineV1(_royaltyEngine);
 
         //Create dummy listing at index 0
         listings.push();
@@ -137,53 +124,61 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
-     * @dev Mints NFT to {publicMinter} collection and lists it. Emits {ListItem} event.
+     * @dev Mints NFT to {collection} collection and lists it. Emits {ListItem} event.
+     * @param tokenURI - Token metadata URI.
      * @param maxTickets - Max amounts of tickets that can be bought by participants.
      * @param ticketPrice - Price for a single ticket.
      * @param duration - Duration of listing. Can be in range [minDuration, maxDuration].
-     
+     * @param royaltyReceiver - Receiver of royalties from each NFT sale.
+     * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
+
      * @return ID - ID of listing created.
      * @return tokenID - ID of token that was minted.
      * Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract
      */
     function mintAndListItem(
+        string memory tokenURI, 
         uint256 maxTickets, 
         uint256 ticketPrice, 
         uint256 duration,
+        address royaltyReceiver,
         uint96 royaltyFeeNumerator
     ) external returns(uint256 ID, uint256 tokenID){
-        tokenID = publicMinter.nextTokenId();
-        publicMinter.mint(1);
-        publicMinter.setRoyaltyForTokenID(tokenID, msg.sender, royaltyFeeNumerator);
-        ID = _listItem(NFT(IERC721(address(publicMinter)), tokenID), maxTickets, ticketPrice, duration);
+        string[] memory tokenURIs = new string[](1);
+        tokenURIs[0] = tokenURI;
+        (IERC721 collection, uint256[] memory tokenIDs) = minter.mintToPublicCollection(1, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
+        tokenID = tokenIDs[0];
+        ID = _listItem(NFT(collection, tokenID), maxTickets, ticketPrice, duration);
     }
 
     /**
-     * @dev Mints NFTs to {publicMinter} collection and lists them. Emits {ListItem} event for each NFT listed.
+     * @dev Mints NFTs to {collection} collection and lists them. Emits {ListItem} event for each NFT listed.
+     * @param tokenURIs - Token metadata URIs.
      * @param maxTickets - Max amounts of tickets that can be bought by participants.
      * @param ticketPrices - Prices for a single ticket.
      * @param durations - Durations of listings. Can be in range [minDuration, maxDuration].
+     * @param royaltyReceiver - Receiver of royalties from each NFT sale.
+     * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
      
      * @return IDs - IDs of listings created.
      * @return tokenIDs - IDs of tokens that were minted.
      * Note This function costs less than mintAndListItemsWithDeploy() but does not deploy additional NFT collection contract
      */
     function mintAndListItems(
+        string[] memory tokenURIs, 
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices, 
         uint256[] memory durations,
-        uint96[] memory royaltyFeeNumerators
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        uint256 startTokenId = publicMinter.nextTokenId();
-        publicMinter.mint(maxTickets.length);
+        IERC721 collection;
+        (collection, tokenIDs) = minter.mintToPublicCollection(maxTickets.length, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
 
         IDs = new uint256[](maxTickets.length);
-        tokenIDs = new uint256[](maxTickets.length);
         for(uint256 i; i < maxTickets.length; i++){
-            tokenIDs[i] = i + startTokenId;
-            publicMinter.setRoyaltyForTokenID(tokenIDs[i], msg.sender, royaltyFeeNumerators[i]);
-            IDs[i] = _listItem(NFT(IERC721(address(publicMinter)), tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
+            IDs[i] = _listItem(NFT(collection, tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
         }
     }
 
@@ -195,6 +190,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param maxTickets - Max amounts of tickets that can be bought by participants.
      * @param ticketPrice - Price for a single ticket.
      * @param duration - Duration of listing. Can be in range [minDuration, maxDuration].
+     * @param royaltyReceiver - Receiver of royalties from each NFT sale.
+     * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
      
      * @return ID - ID of listings created.
      * @return tokenID - ID of tokens that were minted.
@@ -205,17 +202,15 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         string memory symbol, 
         string memory baseURI, 
         string memory contractURI,
-        uint96 royaltyFeeNumerator,
         uint256 maxTickets, 
         uint256 ticketPrice,
-        uint256 duration
+        uint256 duration,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256 ID, uint256 tokenID){
-        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI, contractURI, royaltyFeeNumerator);
-        NFTMinter.mint(1);
-        NFTMinter.renounceOwnership();
-
-        tokenID = NFTMinter.startTokenId();
-        ID = _listItem(NFT(IERC721(address(NFTMinter)), tokenID), maxTickets, ticketPrice, duration);
+        (IERC721 collection, uint256[] memory tokenIDs) = minter.mintToPrivateCollection(1, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
+        tokenID = tokenIDs[0];
+        ID = _listItem(NFT(collection, tokenID), maxTickets, ticketPrice, duration);
     }
 
     /**
@@ -226,6 +221,8 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param maxTickets - Max amounts of tickets that can be bought by participants.
      * @param ticketPrices - Prices for a single ticket.
      * @param durations - Durations of listings. Can be in range [minDuration, maxDuration].
+     * @param royaltyReceiver - Receiver of royalties from each NFT sale.
+     * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
      
      * @return IDs - IDs of listings created.
      * @return tokenIDs - IDs of tokens that were minted.
@@ -236,22 +233,19 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         string memory symbol, 
         string memory baseURI, 
         string memory contractURI,
-        uint96 royaltyFeeNumerator,
         uint256[] memory maxTickets, 
         uint256[] memory ticketPrices,
-        uint256[] memory durations
+        uint256[] memory durations,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        eeseeNFT NFTMinter = new eeseeNFT(name, symbol, baseURI, contractURI, royaltyFeeNumerator);
-        NFTMinter.mint(maxTickets.length);
-        NFTMinter.renounceOwnership();
-
-        uint256 startTokenId = NFTMinter.startTokenId();
+        IERC721 collection;
+        (collection, tokenIDs) = minter.mintToPrivateCollection(maxTickets.length, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
+        
         IDs = new uint256[](maxTickets.length);
-        tokenIDs = new uint256[](maxTickets.length);
         for(uint256 i; i < maxTickets.length; i++){
-            tokenIDs[i] = i + startTokenId;
-            IDs[i] = _listItem(NFT(IERC721(address(NFTMinter)), tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
+            IDs[i] = _listItem(NFT(collection, tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
         }
     }
 
@@ -350,7 +344,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
                 delete listings[ID];
             }
         }
-        //transfer later to save gas
+        // Transfer later to save gas
         ESE.safeTransfer(recipient, amount);
     }
 
@@ -416,7 +410,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
                 delete listings[ID];
             }
         }
-        //transfer later to save some gas
+        // Transfer later to save some gas
         ESE.safeTransfer(recipient, amount);
     }
 
@@ -454,7 +448,7 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     // ============ Internal Methods ============
 
-    // Note: must be called after nft was minted/transfered
+    // Note: Must be called after nft was minted/transfered
     function _listItem(NFT memory nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) internal returns(uint256 ID){
         require(duration >= minDuration, "eesee: Duration must be more or equal minDuration");
         require(duration <= maxDuration, "eesee: Duration must be less or equal maxDuration");
@@ -476,14 +470,16 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
         emit ListItem(ID, nft, listing.owner, maxTickets, ticketPrice, duration);
     }
+
     function _collectRoyalties(address tokenAddress, uint256 tokenID, uint256 value) internal returns(uint256 royaltyAmount) {
         (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(tokenAddress, tokenID, value);
         for(uint256 i = 0; i < recipients.length; i++){
             ESE.safeTransfer(recipients[i], amounts[i]);
             royaltyAmount += amounts[i];
+            emit CollectRoyalty(recipients[i], amounts[i]);
         }
-        emit CollectRoyalties(recipients, amounts);
     }
+
     function _collectSellFees(uint256 amount, uint256 _devFee, uint256 _poolFee) internal returns(uint256 feeAmount){
         uint256 devFeeAmount = amount * _devFee / 1 ether;
         if(devFeeAmount > 0){
@@ -519,9 +515,17 @@ contract eesee is IEesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     // ============ Admin Methods ============
-     function changeRoyaltyEngine(address _royaltyEngine) external onlyOwner {
-        royaltyEngine = IRoyaltyEngineV1(_royaltyEngine);
-     }
+
+    /**
+     * @dev Changes minter. Emits {ChangeMinter} event.
+     * @param _minter - New minter.
+     * Note: This function can only be called by owner.
+     */
+    function changeMinter(IeeseeNFTMinter _minter) external onlyOwner {
+        emit ChangeMinter(minter, _minter);
+        minter = _minter;
+    }
+
     /**
      * @dev Changes minDuration. Emits {ChangeMinDuration} event.
      * @param _minDuration - New minDuration.
