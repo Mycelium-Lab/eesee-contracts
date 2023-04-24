@@ -7,26 +7,41 @@
 const hre = require("hardhat");
 
 async function main() {
-    const { network } = hre
+    const { network, run } = hre
 
     const ESE = await hre.ethers.getContractFactory("ESE");
     const minter = await hre.ethers.getContractFactory("eeseeNFTMinter");
     const pool = await hre.ethers.getContractFactory("eeseePool");
     const eesee = await hre.ethers.getContractFactory("eesee");
+    let args
+    args = ['1000000000000000000000000000']
+    const _ESE = await ESE.deploy(...args)
+    await _ESE.deployTransaction.wait(6);
+    await run("verify:verify", {
+        address: _ESE.address,
+        constructorArguments: args
+    })
 
-    const _ESE = await ESE.deploy('1000000000000000000000000000')
-    await _ESE.deployed()
-
-    const _minter = await minter.deploy('','')//TODO
-    await _minter.deployed()
-
-    const _pool = await pool.deploy(_ESE.address)
-    await _pool.deployed()
+    args = ['','']//TODO
+    const _minter = await minter.deploy(...args)
+    await _minter.deployTransaction.wait(6);
+    await run("verify:verify", {
+        address: _minter.address,
+        constructorArguments: args
+    })
+    
+    args = [_ESE.address]
+    const _pool = await pool.deploy(...args)
+    await _pool.deployTransaction.wait(6)
+    await run("verify:verify", {
+        address: _pool.address,
+        constructorArguments: args
+    })
 
     let _eesee
     if(network.name === 'goerli'){
         //goerli testnet
-        _eesee = await eesee.deploy(
+        args = [
             _ESE.address, 
             _pool.address, 
             _minter.address,
@@ -37,9 +52,9 @@ async function main() {
             '0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15',//150 gwei hash
             3,//minimumRequestConfirmations
             50000//callbackGasLimit
-        )
+        ]
     }else if(network.name === 'ethereum'){
-        _eesee = await eesee.deploy(
+        args = [
             _ESE.address, 
             _pool.address, 
             _minter.address,
@@ -50,9 +65,9 @@ async function main() {
             '0x8af398995b04c28e9951adb9721ef74c74f93e6a478f39e7e0777be13527e7ef',//150 gwei hash
             13,//minimumRequestConfirmations
             50000//callbackGasLimit
-        )
+        ]
     }else if(network.name === 'polygon'){
-        _eesee = await eesee.deploy(
+        args = [
             _ESE.address, 
             _pool.address,
             _minter.address, 
@@ -63,11 +78,18 @@ async function main() {
             '0x6e099d640cde6de9d40ac749b4b594126b0169747122711109c9985d47751f93',//200 gwei hash
             13,//minimumRequestConfirmations
             50000//callbackGasLimit
-        )
+        ]
     }else{
         return
     }
-    await _eesee.deployed()
+
+    _eesee = await eesee.deploy(...args)
+    await _eesee.deployTransaction.wait(6);
+
+    await run("verify:verify", {
+        address: _eesee.address,
+        constructorArguments: args,
+    })
 
     console.log(`eesee: ${_eesee.address}`)
 }

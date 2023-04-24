@@ -334,8 +334,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
-            _amount -= _collectSellFees(_amount, listing.devFee, listing.poolFee);
             _amount -= _collectRoyalties(address(listing.nft.token), listing.nft.tokenID, _amount);
+            _amount -= _collectSellFees(_amount, listing.devFee, listing.poolFee);
             amount += _amount;
 
             emit ReceiveTokens(ID, recipient, _amount);
