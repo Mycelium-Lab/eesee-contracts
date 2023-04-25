@@ -124,7 +124,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
-     * @dev Mints NFT to {collection} collection and lists it. Emits {ListItem} event.
+     * @dev Mints NFT to a public collection and lists it. Emits {ListItem} event.
      * @param tokenURI - Token metadata URI.
      * @param maxTickets - Max amounts of tickets that can be bought by participants.
      * @param ticketPrice - Price for a single ticket.
@@ -152,7 +152,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
-     * @dev Mints NFTs to {collection} collection and lists them. Emits {ListItem} event for each NFT listed.
+     * @dev Mints NFTs to a public collection and lists them. Emits {ListItem} event for each NFT listed.
      * @param tokenURIs - Token metadata URIs.
      * @param maxTickets - Max amounts of tickets that can be bought by participants.
      * @param ticketPrices - Prices for a single ticket.

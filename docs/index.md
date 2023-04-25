@@ -1,367 +1,284 @@
 # Solidity API
 
-## IEesee
+## ESE
 
-### NFT
-
-```solidity
-struct NFT {
-  contract IERC721 token;
-  uint256 tokenID;
-}
-```
-
-### Listing
+### constructor
 
 ```solidity
-struct Listing {
-  uint256 ID;
-  struct IEesee.NFT nft;
-  address owner;
-  uint256 maxTickets;
-  mapping(uint256 => address) ticketIDBuyer;
-  mapping(address => uint256) ticketsBoughtByAddress;
-  uint256 ticketPrice;
-  uint256 ticketsBought;
-  uint256 devFee;
-  uint256 poolFee;
-  uint256 creationTime;
-  uint256 duration;
-  address winner;
-  bool itemClaimed;
-  bool tokensClaimed;
-}
+constructor(uint256 amount) public
 ```
 
-### Item
+## eeseeNFT
+
+### URI
 
 ```solidity
-struct Item {
-  struct IEesee.NFT nft;
-  uint256 maxTickets;
-  uint256 ticketPrice;
-  uint256 duration;
-}
+string URI
 ```
 
-### ListItem
+_baseURI this contract uses,_
+
+### contractURI
 
 ```solidity
-event ListItem(uint256 ID, struct IEesee.NFT nft, address owner, uint256 maxTickets, uint256 ticketPrice, uint256 duration)
+string contractURI
 ```
 
-### BuyTicket
+_Opensea royalty and NFT collection info_
+
+### constructor
 
 ```solidity
-event BuyTicket(uint256 ID, address buyer, uint256 ticketID, uint256 ticketPrice)
+constructor(string name, string symbol, string _URI, string _contractURI) public
 ```
 
-### RequestWords
+### tokenURI
 
 ```solidity
-event RequestWords(uint256 ID, uint256 requestID)
+function tokenURI(uint256 tokenId) public view virtual returns (string)
 ```
 
-### FulfillListing
+_Returns tokenId's token URI. If there is no URI in tokenURIs uses baseURI._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenId | uint256 | - Token ID to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | string | string Token URI. |
+
+### nextTokenId
 
 ```solidity
-event FulfillListing(uint256 ID, struct IEesee.NFT nft, address winner)
+function nextTokenId() external view returns (uint256)
 ```
 
-### ReceiveItem
+_Returns next token ID to be minted._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 Token ID. |
+
+### mint
 
 ```solidity
-event ReceiveItem(uint256 ID, struct IEesee.NFT nft, address recipient)
+function mint(address recipient, uint256 quantity) external
 ```
 
-### ReceiveTokens
+_Mints a {quantity} of NFTs and sends them to the {recipient}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| recipient | address | - Receiver of NFTs. |
+| quantity | uint256 | - Quantity of NFTs to mint.       Note: This function can only be called by owner. |
+
+### setURIForTokenId
 
 ```solidity
-event ReceiveTokens(uint256 ID, address recipient, uint256 amount)
+function setURIForTokenId(uint256 tokenId, string _tokenURI) external
 ```
 
-### ReclaimItem
+_Sets {_tokenURI} for a specified {tokenId}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenId | uint256 | - Token ID to set URI for. |
+| _tokenURI | string | - Token URI.       Note: This function can only be called by owner. |
+
+### setDefaultRoyalty
 
 ```solidity
-event ReclaimItem(uint256 ID, struct IEesee.NFT nft, address recipient)
+function setDefaultRoyalty(address receiver, uint96 feeNumerator) external
 ```
 
-### ReclaimTokens
+_Sets default royalty for this collection._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| receiver | address | - Royalty receiver. |
+| feeNumerator | uint96 | - Royalty amount. [10000 == 100%].       Note: This function can only be called by owner. |
+
+### setRoyaltyForTokenId
 
 ```solidity
-event ReclaimTokens(uint256 ID, address sender, address recipient, uint256 tickets, uint256 amount)
+function setRoyaltyForTokenId(uint256 tokenId, address receiver, uint96 feeNumerator) external
 ```
 
-### CollectDevFee
+_Sets royalty for a single {tokenId} in the collection._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenId | uint256 | - Token ID to set royalty for. |
+| receiver | address | - Royalty receiver. |
+| feeNumerator | uint96 | - Royalty amount. [10000 == 100%].       Note: This function can only be called by owner. |
+
+### _startTokenId
 
 ```solidity
-event CollectDevFee(address to, uint256 amount)
+function _startTokenId() internal pure returns (uint256)
 ```
 
-### CollectPoolFee
+_Returns the starting token ID.
+To change the starting token ID, please override this function._
+
+### _baseURI
 
 ```solidity
-event CollectPoolFee(address pool, uint256 amount)
+function _baseURI() internal view returns (string)
 ```
 
-### ChangeMinDuration
+_Base URI for computing {tokenURI}. If set, the resulting URI for each
+token will be the concatenation of the `baseURI` and the `tokenId`. Empty
+by default, it can be overridden in child contracts._
+
+### setApprovalForAll
 
 ```solidity
-event ChangeMinDuration(uint256 previousMinDuration, uint256 newMinDuration)
+function setApprovalForAll(address operator, bool approved) public
 ```
 
-### ChangeMaxDuration
+_Approve or remove `operator` as an operator for the caller.
+Operators can call {transferFrom} or {safeTransferFrom}
+for any token owned by the caller.
+
+Requirements:
+
+- The `operator` cannot be the caller.
+
+Emits an {ApprovalForAll} event._
+
+### approve
 
 ```solidity
-event ChangeMaxDuration(uint256 previousMaxDuration, uint256 newMaxDuration)
+function approve(address operator, uint256 tokenId) public payable
 ```
 
-### ChangeMaxTicketsBoughtByAddress
+### transferFrom
 
 ```solidity
-event ChangeMaxTicketsBoughtByAddress(uint256 previousMaxTicketsBoughtByAddress, uint256 newMaxTicketsBoughtByAddress)
+function transferFrom(address from, address to, uint256 tokenId) public payable
 ```
 
-### ChangeDevFee
+_Transfers `tokenId` from `from` to `to`.
+
+Requirements:
+
+- `from` cannot be the zero address.
+- `to` cannot be the zero address.
+- `tokenId` token must be owned by `from`.
+- If the caller is not `from`, it must be approved to move this token
+by either {approve} or {setApprovalForAll}.
+
+Emits a {Transfer} event._
+
+### safeTransferFrom
 
 ```solidity
-event ChangeDevFee(uint256 previousDevFee, uint256 newDevFee)
+function safeTransferFrom(address from, address to, uint256 tokenId) public payable
 ```
 
-### ChangePoolFee
+_Equivalent to `safeTransferFrom(from, to, tokenId, '')`._
+
+### safeTransferFrom
 
 ```solidity
-event ChangePoolFee(uint256 previousPoolFee, uint256 newPoolFee)
+function safeTransferFrom(address from, address to, uint256 tokenId, bytes data) public payable
 ```
 
-### ChangeFeeCollector
+### supportsInterface
 
 ```solidity
-event ChangeFeeCollector(address previousFeeColector, address newFeeCollector)
+function supportsInterface(bytes4 interfaceId) public view returns (bool)
 ```
 
-### listings
+## eeseeNFTMinter
+
+### publicCollection
 
 ```solidity
-function listings(uint256) external view returns (uint256 ID, struct IEesee.NFT nft, address owner, uint256 maxTickets, uint256 ticketPrice, uint256 ticketsBought, uint256 devFee, uint256 poolFee, uint256 creationTime, uint256 duration, address winner, bool itemClaimed, bool tokensClaime)
+contract eeseeNFT publicCollection
 ```
 
-### ESE
+_The collection contract NFTs are minted to to save gas._
+
+### constructor
 
 ```solidity
-function ESE() external view returns (contract IERC20)
+constructor(string baseURI, string contractURI) public
 ```
 
-### rewardPool
+### mintToPublicCollection
 
 ```solidity
-function rewardPool() external view returns (address)
+function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
 ```
 
-### publicMinter
+_Mints {amount} of NFTs to public collection to save gas._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of NFTs to mint. |
+| tokenURIs | string[] | - Metadata URIs of all NFTs minted. |
+| royaltyReceiver | address | -  Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| collection | address | - Address of the collection the NFTs were minted to. |
+| tokenIDs | uint256[] | - IDs of tokens minted. |
+
+### mintToPrivateCollection
 
 ```solidity
-function publicMinter() external view returns (contract eeseeNFT)
+function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
 ```
 
-### minDuration
+_Deploys a sepparate private collection contract and mints {amount} of NFTs to it._
 
-```solidity
-function minDuration() external view returns (uint256)
-```
+#### Parameters
 
-### maxDuration
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of NFTs to mint. |
+| name | string | - The name for a collection. |
+| symbol | string | - The symbol of the collection. |
+| baseURI | string | - Collection metadata URI. |
+| contractURI | string | - Contract URI for opensea's royalties. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
 
-```solidity
-function maxDuration() external view returns (uint256)
-```
+#### Return Values
 
-### maxTicketsBoughtByAddress
-
-```solidity
-function maxTicketsBoughtByAddress() external view returns (uint256)
-```
-
-### devFee
-
-```solidity
-function devFee() external view returns (uint256)
-```
-
-### poolFee
-
-```solidity
-function poolFee() external view returns (uint256)
-```
-
-### feeCollector
-
-```solidity
-function feeCollector() external view returns (address)
-```
-
-### LINK
-
-```solidity
-function LINK() external view returns (contract LinkTokenInterface)
-```
-
-### vrfCoordinator
-
-```solidity
-function vrfCoordinator() external view returns (contract VRFCoordinatorV2Interface)
-```
-
-### subscriptionID
-
-```solidity
-function subscriptionID() external view returns (uint64)
-```
-
-### keyHash
-
-```solidity
-function keyHash() external view returns (bytes32)
-```
-
-### minimumRequestConfirmations
-
-```solidity
-function minimumRequestConfirmations() external view returns (uint16)
-```
-
-### listItem
-
-```solidity
-function listItem(struct IEesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID)
-```
-
-### listItems
-
-```solidity
-function listItems(struct IEesee.NFT[] nfts, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs)
-```
-
-### mintAndListItem
-
-```solidity
-function mintAndListItem(uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
-```
-
-### mintAndListItems
-
-```solidity
-function mintAndListItems(uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs, uint256[] tokenIDs)
-```
-
-### mintAndListItemWithDeploy
-
-```solidity
-function mintAndListItemWithDeploy(string name, string symbol, string baseURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
-```
-
-### mintAndListItemsWithDeploy
-
-```solidity
-function mintAndListItemsWithDeploy(string name, string symbol, string baseURI, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs, uint256[] tokenIDs)
-```
-
-### buyTickets
-
-```solidity
-function buyTickets(uint256 ID, uint256 amount) external returns (uint256 tokensSpent)
-```
-
-### batchReceiveItems
-
-```solidity
-function batchReceiveItems(uint256[] IDs, address recipient) external returns (contract IERC721[] tokens, uint256[] tokenIDs)
-```
-
-### batchReceiveTokens
-
-```solidity
-function batchReceiveTokens(uint256[] IDs, address recipient) external returns (uint256 amount)
-```
-
-### batchReclaimItems
-
-```solidity
-function batchReclaimItems(uint256[] IDs, address recipient) external returns (contract IERC721[] tokens, uint256[] tokenIDs)
-```
-
-### batchReclaimTokens
-
-```solidity
-function batchReclaimTokens(uint256[] IDs, address recipient) external returns (uint256 amount)
-```
-
-### getListingsLength
-
-```solidity
-function getListingsLength() external view returns (uint256 length)
-```
-
-### getListingTicketIDBuyer
-
-```solidity
-function getListingTicketIDBuyer(uint256 ID, uint256 ticket) external view returns (address)
-```
-
-### getListingTicketsBoughtByAddress
-
-```solidity
-function getListingTicketsBoughtByAddress(uint256 ID, address _address) external view returns (uint256)
-```
-
-### changeMinDuration
-
-```solidity
-function changeMinDuration(uint256 _minDuration) external
-```
-
-### changeMaxDuration
-
-```solidity
-function changeMaxDuration(uint256 _maxDuration) external
-```
-
-### changeMaxTicketsBoughtByAddress
-
-```solidity
-function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external
-```
-
-### changeDevFee
-
-```solidity
-function changeDevFee(uint256 _devFee) external
-```
-
-### changePoolFee
-
-```solidity
-function changePoolFee(uint256 _poolFee) external
-```
-
-### changeFeeCollector
-
-```solidity
-function changeFeeCollector(address _feeCollector) external
-```
-
-### fund
-
-```solidity
-function fund(uint96 amount) external
-```
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| collection | address | - Address of the collection the NFTs were minted to. |
+| tokenIDs | uint256[] | - IDs of tokens minted. |
 
 ## eesee
 
 ### listings
 
 ```solidity
-struct IEesee.Listing[] listings
+struct Ieesee.Listing[] listings
 ```
 
 _An array of all existing listings._
@@ -382,13 +299,13 @@ address rewardPool
 
 _Reward pool {poolFee} fees are sent to._
 
-### publicMinter
+### minter
 
 ```solidity
-contract eeseeNFT publicMinter
+contract IeeseeNFTMinter minter
 ```
 
-_The collection contract NFTs are minted to to save gas._
+_Contract that mints NFTs_
 
 ### minDuration
 
@@ -479,13 +396,13 @@ _Chainlink VRF V2 request confirmations._
 ### constructor
 
 ```solidity
-constructor(contract IERC20 _ESE, address _rewardPool, string baseURI, address _feeCollector, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit) public
+constructor(contract IERC20 _ESE, address _rewardPool, contract IeeseeNFTMinter _minter, address _feeCollector, contract IRoyaltyEngineV1 _royaltyEngine, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit) public
 ```
 
 ### listItem
 
 ```solidity
-function listItem(struct IEesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID)
+function listItem(struct Ieesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID)
 ```
 
 _Lists NFT from sender's balance. Emits {ListItem} event._
@@ -494,7 +411,7 @@ _Lists NFT from sender's balance. Emits {ListItem} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| nft | struct IEesee.NFT | - NFT to list. Note: The sender must have it approved for this contract. |
+| nft | struct Ieesee.NFT | - NFT to list. Note: The sender must have it approved for this contract. |
 | maxTickets | uint256 | - Max amount of tickets that can be bought by participants. |
 | ticketPrice | uint256 | - Price for a single ticket. |
 | duration | uint256 | - Duration of listings. Can be in range [minDuration, maxDuration]. |
@@ -508,7 +425,7 @@ _Lists NFT from sender's balance. Emits {ListItem} event._
 ### listItems
 
 ```solidity
-function listItems(struct IEesee.NFT[] nfts, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs)
+function listItems(struct Ieesee.NFT[] nfts, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs)
 ```
 
 _Lists NFTs from sender's balance. Emits {ListItem} events for each NFT listed._
@@ -517,7 +434,7 @@ _Lists NFTs from sender's balance. Emits {ListItem} events for each NFT listed._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| nfts | struct IEesee.NFT[] | - NFTs to list. Note: The sender must have them approved for this contract. |
+| nfts | struct Ieesee.NFT[] | - NFTs to list. Note: The sender must have them approved for this contract. |
 | maxTickets | uint256[] | - Max amount of tickets that can be bought by participants. |
 | ticketPrices | uint256[] | - Prices for a single ticket. |
 | durations | uint256[] | - Durations of listings. Can be in range [minDuration, maxDuration]. |
@@ -531,18 +448,21 @@ _Lists NFTs from sender's balance. Emits {ListItem} events for each NFT listed._
 ### mintAndListItem
 
 ```solidity
-function mintAndListItem(uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
+function mintAndListItem(string tokenURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, uint256 tokenID)
 ```
 
-_Mints NFT to {publicMinter} collection and lists it. Emits {ListItem} event._
+_Mints NFT to a public collection and lists it. Emits {ListItem} event._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
+| tokenURI | string | - Token metadata URI. |
 | maxTickets | uint256 | - Max amounts of tickets that can be bought by participants. |
 | ticketPrice | uint256 | - Price for a single ticket. |
 | duration | uint256 | - Duration of listing. Can be in range [minDuration, maxDuration]. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
 
 #### Return Values
 
@@ -554,18 +474,21 @@ _Mints NFT to {publicMinter} collection and lists it. Emits {ListItem} event._
 ### mintAndListItems
 
 ```solidity
-function mintAndListItems(uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs, uint256[] tokenIDs)
+function mintAndListItems(string[] tokenURIs, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256[] IDs, uint256[] tokenIDs)
 ```
 
-_Mints NFTs to {publicMinter} collection and lists them. Emits {ListItem} event for each NFT listed._
+_Mints NFTs to a public collection and lists them. Emits {ListItem} event for each NFT listed._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
+| tokenURIs | string[] | - Token metadata URIs. |
 | maxTickets | uint256[] | - Max amounts of tickets that can be bought by participants. |
 | ticketPrices | uint256[] | - Prices for a single ticket. |
 | durations | uint256[] | - Durations of listings. Can be in range [minDuration, maxDuration]. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
 
 #### Return Values
 
@@ -577,7 +500,7 @@ _Mints NFTs to {publicMinter} collection and lists them. Emits {ListItem} event 
 ### mintAndListItemWithDeploy
 
 ```solidity
-function mintAndListItemWithDeploy(string name, string symbol, string baseURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID, uint256 tokenID)
+function mintAndListItemWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, uint256 tokenID)
 ```
 
 _Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListItem} event._
@@ -589,9 +512,12 @@ _Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListI
 | name | string | - Name for a collection. |
 | symbol | string | - Collection symbol. |
 | baseURI | string | - URI to store NFT metadata in. |
+| contractURI | string |  |
 | maxTickets | uint256 | - Max amounts of tickets that can be bought by participants. |
 | ticketPrice | uint256 | - Price for a single ticket. |
 | duration | uint256 | - Duration of listing. Can be in range [minDuration, maxDuration]. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
 
 #### Return Values
 
@@ -603,7 +529,7 @@ _Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListI
 ### mintAndListItemsWithDeploy
 
 ```solidity
-function mintAndListItemsWithDeploy(string name, string symbol, string baseURI, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs, uint256[] tokenIDs)
+function mintAndListItemsWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256[] IDs, uint256[] tokenIDs)
 ```
 
 _Deploys new NFT collection contract, mints NFTs to it and lists them. Emits {ListItem} event for each NFT listed._
@@ -615,9 +541,12 @@ _Deploys new NFT collection contract, mints NFTs to it and lists them. Emits {Li
 | name | string | - Name for a collection. |
 | symbol | string | - Collection symbol. |
 | baseURI | string | - URI to store NFT metadata in. |
+| contractURI | string |  |
 | maxTickets | uint256[] | - Max amounts of tickets that can be bought by participants. |
 | ticketPrices | uint256[] | - Prices for a single ticket. |
 | durations | uint256[] | - Durations of listings. Can be in range [minDuration, maxDuration]. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
 
 #### Return Values
 
@@ -792,7 +721,13 @@ _Get the amount of tickets bought by address in listing._
 ### _listItem
 
 ```solidity
-function _listItem(struct IEesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) internal returns (uint256 ID)
+function _listItem(struct Ieesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) internal returns (uint256 ID)
+```
+
+### _collectRoyalties
+
+```solidity
+function _collectRoyalties(address tokenAddress, uint256 tokenID, uint256 value) internal returns (uint256 royaltyAmount)
 ```
 
 ### _collectSellFees
@@ -815,6 +750,20 @@ _This function is called by Chainlink. Chooses listing winner and emits {Fulfill
 | ---- | ---- | ----------- |
 | requestID | uint256 | - Chainlink request ID. |
 | randomWords | uint256[] | - Random values sent by Chainlink. |
+
+### changeMinter
+
+```solidity
+function changeMinter(contract IeeseeNFTMinter _minter) external
+```
+
+_Changes minter. Emits {ChangeMinter} event._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _minter | contract IeeseeNFTMinter | - New minter. Note: This function can only be called by owner. |
 
 ### changeMinDuration
 
@@ -913,57 +862,6 @@ _Fund function for Chainlink's VRF V2 subscription._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | amount | uint96 | - Amount of LINK to fund subscription with. |
-
-## eeseeNFT
-
-### URI
-
-```solidity
-string URI
-```
-
-### constructor
-
-```solidity
-constructor(string name, string symbol, string _URI) public
-```
-
-### mint
-
-```solidity
-function mint(uint256 quantity) external
-```
-
-### startTokenId
-
-```solidity
-function startTokenId() external pure returns (uint256)
-```
-
-### _startTokenId
-
-```solidity
-function _startTokenId() internal pure returns (uint256)
-```
-
-_Returns the starting token ID.
-To change the starting token ID, please override this function._
-
-### nextTokenId
-
-```solidity
-function nextTokenId() external view returns (uint256)
-```
-
-### _baseURI
-
-```solidity
-function _baseURI() internal view returns (string)
-```
-
-_Base URI for computing {tokenURI}. If set, the resulting URI for each
-token will be the concatenation of the `baseURI` and the `tokenId`. Empty
-by default, it can be overridden in child contracts._
 
 ## eeseePool
 
@@ -1097,12 +995,436 @@ _Verifies {claim} for {claimer}._
 | ---- | ---- | ----------- |
 | [0] | bool | bool - Does {claim} exist in merkle root. |
 
-## ESE
+## IRoyaltyEngineV1
 
-### constructor
+_Lookup engine interface_
+
+### getRoyalty
 
 ```solidity
-constructor(uint256 amount) public
+function getRoyalty(address tokenAddress, uint256 tokenId, uint256 value) external returns (address payable[] recipients, uint256[] amounts)
+```
+
+Get the royalty for a given token (address, id) and value amount.  Does not cache the bps/amounts.  Caches the spec for a given token address
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenAddress | address | - The address of the token |
+| tokenId | uint256 | - The id of the token |
+| value | uint256 | - The value you wish to get the royalty of  returns Two arrays of equal length, royalty recipients and the corresponding amount each recipient should get |
+
+### getRoyaltyView
+
+```solidity
+function getRoyaltyView(address tokenAddress, uint256 tokenId, uint256 value) external view returns (address payable[] recipients, uint256[] amounts)
+```
+
+View only version of getRoyalty
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenAddress | address | - The address of the token |
+| tokenId | uint256 | - The id of the token |
+| value | uint256 | - The value you wish to get the royalty of  returns Two arrays of equal length, royalty recipients and the corresponding amount each recipient should get |
+
+## Ieesee
+
+### NFT
+
+```solidity
+struct NFT {
+  contract IERC721 token;
+  uint256 tokenID;
+}
+```
+
+### Listing
+
+```solidity
+struct Listing {
+  uint256 ID;
+  struct Ieesee.NFT nft;
+  address owner;
+  uint256 maxTickets;
+  mapping(uint256 => address) ticketIDBuyer;
+  mapping(address => uint256) ticketsBoughtByAddress;
+  uint256 ticketPrice;
+  uint256 ticketsBought;
+  uint256 devFee;
+  uint256 poolFee;
+  uint256 creationTime;
+  uint256 duration;
+  address winner;
+  bool itemClaimed;
+  bool tokensClaimed;
+}
+```
+
+### Item
+
+```solidity
+struct Item {
+  struct Ieesee.NFT nft;
+  uint256 maxTickets;
+  uint256 ticketPrice;
+  uint256 duration;
+}
+```
+
+### ListItem
+
+```solidity
+event ListItem(uint256 ID, struct Ieesee.NFT nft, address owner, uint256 maxTickets, uint256 ticketPrice, uint256 duration)
+```
+
+### BuyTicket
+
+```solidity
+event BuyTicket(uint256 ID, address buyer, uint256 ticketID, uint256 ticketPrice)
+```
+
+### RequestWords
+
+```solidity
+event RequestWords(uint256 ID, uint256 requestID)
+```
+
+### FulfillListing
+
+```solidity
+event FulfillListing(uint256 ID, struct Ieesee.NFT nft, address winner)
+```
+
+### ReceiveItem
+
+```solidity
+event ReceiveItem(uint256 ID, struct Ieesee.NFT nft, address recipient)
+```
+
+### ReceiveTokens
+
+```solidity
+event ReceiveTokens(uint256 ID, address recipient, uint256 amount)
+```
+
+### ReclaimItem
+
+```solidity
+event ReclaimItem(uint256 ID, struct Ieesee.NFT nft, address recipient)
+```
+
+### ReclaimTokens
+
+```solidity
+event ReclaimTokens(uint256 ID, address sender, address recipient, uint256 tickets, uint256 amount)
+```
+
+### CollectRoyalty
+
+```solidity
+event CollectRoyalty(address recipient, uint256 amount)
+```
+
+### CollectDevFee
+
+```solidity
+event CollectDevFee(address to, uint256 amount)
+```
+
+### CollectPoolFee
+
+```solidity
+event CollectPoolFee(address pool, uint256 amount)
+```
+
+### ChangeMinter
+
+```solidity
+event ChangeMinter(contract IeeseeNFTMinter previousMinter, contract IeeseeNFTMinter newMinter)
+```
+
+### ChangeMinDuration
+
+```solidity
+event ChangeMinDuration(uint256 previousMinDuration, uint256 newMinDuration)
+```
+
+### ChangeMaxDuration
+
+```solidity
+event ChangeMaxDuration(uint256 previousMaxDuration, uint256 newMaxDuration)
+```
+
+### ChangeMaxTicketsBoughtByAddress
+
+```solidity
+event ChangeMaxTicketsBoughtByAddress(uint256 previousMaxTicketsBoughtByAddress, uint256 newMaxTicketsBoughtByAddress)
+```
+
+### ChangeDevFee
+
+```solidity
+event ChangeDevFee(uint256 previousDevFee, uint256 newDevFee)
+```
+
+### ChangePoolFee
+
+```solidity
+event ChangePoolFee(uint256 previousPoolFee, uint256 newPoolFee)
+```
+
+### ChangeFeeCollector
+
+```solidity
+event ChangeFeeCollector(address previousFeeColector, address newFeeCollector)
+```
+
+### listings
+
+```solidity
+function listings(uint256) external view returns (uint256 ID, struct Ieesee.NFT nft, address owner, uint256 maxTickets, uint256 ticketPrice, uint256 ticketsBought, uint256 devFee, uint256 poolFee, uint256 creationTime, uint256 duration, address winner, bool itemClaimed, bool tokensClaime)
+```
+
+### ESE
+
+```solidity
+function ESE() external view returns (contract IERC20)
+```
+
+### rewardPool
+
+```solidity
+function rewardPool() external view returns (address)
+```
+
+### minter
+
+```solidity
+function minter() external view returns (contract IeeseeNFTMinter)
+```
+
+### minDuration
+
+```solidity
+function minDuration() external view returns (uint256)
+```
+
+### maxDuration
+
+```solidity
+function maxDuration() external view returns (uint256)
+```
+
+### maxTicketsBoughtByAddress
+
+```solidity
+function maxTicketsBoughtByAddress() external view returns (uint256)
+```
+
+### devFee
+
+```solidity
+function devFee() external view returns (uint256)
+```
+
+### poolFee
+
+```solidity
+function poolFee() external view returns (uint256)
+```
+
+### feeCollector
+
+```solidity
+function feeCollector() external view returns (address)
+```
+
+### LINK
+
+```solidity
+function LINK() external view returns (contract LinkTokenInterface)
+```
+
+### vrfCoordinator
+
+```solidity
+function vrfCoordinator() external view returns (contract VRFCoordinatorV2Interface)
+```
+
+### subscriptionID
+
+```solidity
+function subscriptionID() external view returns (uint64)
+```
+
+### keyHash
+
+```solidity
+function keyHash() external view returns (bytes32)
+```
+
+### minimumRequestConfirmations
+
+```solidity
+function minimumRequestConfirmations() external view returns (uint16)
+```
+
+### listItem
+
+```solidity
+function listItem(struct Ieesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns (uint256 ID)
+```
+
+### listItems
+
+```solidity
+function listItems(struct Ieesee.NFT[] nfts, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations) external returns (uint256[] IDs)
+```
+
+### mintAndListItem
+
+```solidity
+function mintAndListItem(string tokenURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, uint256 tokenID)
+```
+
+### mintAndListItems
+
+```solidity
+function mintAndListItems(string[] tokenURIs, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256[] IDs, uint256[] tokenIDs)
+```
+
+### mintAndListItemWithDeploy
+
+```solidity
+function mintAndListItemWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, uint256 tokenID)
+```
+
+### mintAndListItemsWithDeploy
+
+```solidity
+function mintAndListItemsWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256[] maxTickets, uint256[] ticketPrices, uint256[] durations, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256[] IDs, uint256[] tokenIDs)
+```
+
+### buyTickets
+
+```solidity
+function buyTickets(uint256 ID, uint256 amount) external returns (uint256 tokensSpent)
+```
+
+### batchReceiveItems
+
+```solidity
+function batchReceiveItems(uint256[] IDs, address recipient) external returns (contract IERC721[] tokens, uint256[] tokenIDs)
+```
+
+### batchReceiveTokens
+
+```solidity
+function batchReceiveTokens(uint256[] IDs, address recipient) external returns (uint256 amount)
+```
+
+### batchReclaimItems
+
+```solidity
+function batchReclaimItems(uint256[] IDs, address recipient) external returns (contract IERC721[] tokens, uint256[] tokenIDs)
+```
+
+### batchReclaimTokens
+
+```solidity
+function batchReclaimTokens(uint256[] IDs, address recipient) external returns (uint256 amount)
+```
+
+### getListingsLength
+
+```solidity
+function getListingsLength() external view returns (uint256 length)
+```
+
+### getListingTicketIDBuyer
+
+```solidity
+function getListingTicketIDBuyer(uint256 ID, uint256 ticket) external view returns (address)
+```
+
+### getListingTicketsBoughtByAddress
+
+```solidity
+function getListingTicketsBoughtByAddress(uint256 ID, address _address) external view returns (uint256)
+```
+
+### changeMinDuration
+
+```solidity
+function changeMinDuration(uint256 _minDuration) external
+```
+
+### changeMaxDuration
+
+```solidity
+function changeMaxDuration(uint256 _maxDuration) external
+```
+
+### changeMaxTicketsBoughtByAddress
+
+```solidity
+function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external
+```
+
+### changeDevFee
+
+```solidity
+function changeDevFee(uint256 _devFee) external
+```
+
+### changePoolFee
+
+```solidity
+function changePoolFee(uint256 _poolFee) external
+```
+
+### changeFeeCollector
+
+```solidity
+function changeFeeCollector(address _feeCollector) external
+```
+
+### fund
+
+```solidity
+function fund(uint96 amount) external
+```
+
+## IeeseeNFTMinter
+
+### publicCollection
+
+```solidity
+function publicCollection() external view returns (contract IERC721)
+```
+
+### mintToPublicCollection
+
+```solidity
+function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
+```
+
+### mintToPrivateCollection
+
+```solidity
+function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
+```
+
+## MockRoyaltyEngine
+
+### getRoyalty
+
+```solidity
+function getRoyalty(address tokenAddress, uint256 tokenId, uint256 value) public view returns (address payable[] recipients, uint256[] amounts)
 ```
 
 ## MockVRFCoordinator
