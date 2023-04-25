@@ -334,8 +334,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
-            _amount -= _collectSellFees(_amount, listing.devFee, listing.poolFee);
             _amount -= _collectRoyalties(address(listing.nft.token), listing.nft.tokenID, _amount);
+            _amount -= _collectSellFees(_amount, listing.devFee, listing.poolFee);
             amount += _amount;
 
             emit ReceiveTokens(ID, recipient, _amount);
@@ -474,9 +474,11 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     function _collectRoyalties(address tokenAddress, uint256 tokenID, uint256 value) internal returns(uint256 royaltyAmount) {
         (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(tokenAddress, tokenID, value);
         for(uint256 i = 0; i < recipients.length; i++){
-            ESE.safeTransfer(recipients[i], amounts[i]);
-            royaltyAmount += amounts[i];
-            emit CollectRoyalty(recipients[i], amounts[i]);
+            if (recipients[i] != address(0)){
+                ESE.safeTransfer(recipients[i], amounts[i]);
+                royaltyAmount += amounts[i];
+                emit CollectRoyalty(recipients[i], amounts[i]);
+            }
         }
     }
 
