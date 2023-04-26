@@ -28,7 +28,7 @@ const {
         const _mockVRF = await hre.ethers.getContractFactory("MockVRFCoordinator");
         const _eesee = await hre.ethers.getContractFactory("eesee");
         const _NFT = await hre.ethers.getContractFactory("eeseeNFT");
-        const _minter = await hre.ethers.getContractFactory("eeseeNFTMinter");
+        const _minter = await hre.ethers.getContractFactory("eeseeMinter");
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
         ESE = await _ESE.deploy('1000000000000000000000000')
         await ESE.deployed()
@@ -39,7 +39,7 @@ const {
         mockVRF = await _mockVRF.deploy()
         await mockVRF.deployed()
 
-        minter = await _minter.deploy('', '')
+        minter = await _minter.deploy('baseURI.com/', 'contractURI.com/')
         await minter.deployed()
 
         royaltyEninge = await _royaltyEngine.deploy();
@@ -136,7 +136,7 @@ const {
 
     it('mints and lists NFT', async () => {
         await expect(eesee.connect(acc8).mintAndListItem(
-            '/',
+            '1/',
             50,
             3,
             86400,
@@ -145,9 +145,9 @@ const {
         ))
         .to.emit(eesee, "ListItem")
         .withArgs(5, anyValue, acc8.address, 50, 3, 86400)
-        
+
         await expect(eesee.connect(acc8).mintAndListItems(
-            ['/','/', '/'],
+            ['2/', '3/', '4/'],
             [50, 10, 66],
             [3,4,5],
             [86400, 86401, 86402],
@@ -371,7 +371,7 @@ const {
     it('Royalties work for public collections', async () => {
         const currentListingID = (await eesee.getListingsLength()).toNumber()
         await expect(eesee.connect(acc8).mintAndListItem(
-            '/',
+            '5/',
             10,
             10,
             86400,
@@ -382,7 +382,7 @@ const {
         .withArgs(currentListingID, anyValue, acc8.address, 10, 10, 86400)
         
         await expect(eesee.connect(acc8).mintAndListItems(
-            ['/','/'],
+            ['6/','7/'],
             [5, 10],
             [5,5],
             [86400, 86401],
@@ -397,6 +397,18 @@ const {
         const publicNFTCollectionAddress = await minter.publicCollection()
         const NFT = await ethers.getContractFactory("eeseeNFT")
         const publicNFTCollectionContract = await NFT.attach(publicNFTCollectionAddress)
+
+        assert.equal(await publicNFTCollectionContract.name(), "ESE Public Collection", 'Public collection name is correct')
+        assert.equal(await publicNFTCollectionContract.symbol(), "ESE-Public", 'Public collection symbol is correct')
+        assert.equal(await publicNFTCollectionContract.URI(), "baseURI.com/", 'Public collection baseURI is correct')
+        assert.equal(await publicNFTCollectionContract.tokenURI(1), "1/", 'Public collection tokenURI is correct')
+        assert.equal(await publicNFTCollectionContract.contractURI(), "contractURI.com/", 'Public collection contractURI is correct')
+
+        assert.equal(await publicNFTCollectionContract.supportsInterface('0x01ffc9a7'), true, 'collection supports ERC165')
+        assert.equal(await publicNFTCollectionContract.supportsInterface('0x80ac58cd'), true, 'collection supports ERC721')
+        assert.equal(await publicNFTCollectionContract.supportsInterface('0x5b5e139f'), true, 'collection supports ERC721Metadata')
+        assert.equal(await publicNFTCollectionContract.supportsInterface('0x2a55205a'), true, 'collection supports ERC2981')
+
         const listing1 = await eesee.listings(currentListingID)
         const listing2 = await eesee.listings(currentListingID + 1)
         const listing3 = await eesee.listings(currentListingID + 2)
@@ -445,8 +457,8 @@ const {
         await expect(eesee.connect(acc8).mintAndListItemsWithDeploy(
             "APES",
             "bayc",
-            "/",
-            '/',
+            "base/",
+            'contract/',
             [50, 10],
             [3,4],
             [86400, 86401],
@@ -457,9 +469,22 @@ const {
         .withArgs(currentListingID + 1, anyValue, acc8.address, 50, 3, 86400)
         .and.to.emit(eesee, "ListItem")
         .withArgs(currentListingID + 2, anyValue, acc8.address, 10, 4, 86401)
+
         const listing2 = await eesee.listings(currentListingID + 1)
         const listing3 = await eesee.listings(currentListingID + 2)
         const collection2 = NFT.attach(listing2.nft.token)
+
+        assert.equal(await collection2.name(), "APES", 'collection name is correct')
+        assert.equal(await collection2.symbol(), "bayc", 'collection symbol is correct')
+        assert.equal(await collection2.URI(), "base/", 'collection baseURI is correct')
+        assert.equal(await collection2.tokenURI(1), "base/1", 'collection tokenURI is correct')
+        assert.equal(await collection2.contractURI(), "contract/", 'collection contractURI is correct')
+
+        assert.equal(await collection2.supportsInterface('0x01ffc9a7'), true, 'collection supports ERC165')
+        assert.equal(await collection2.supportsInterface('0x80ac58cd'), true, 'collection supports ERC721')
+        assert.equal(await collection2.supportsInterface('0x5b5e139f'), true, 'collection supports ERC721Metadata')
+        assert.equal(await collection2.supportsInterface('0x2a55205a'), true, 'collection supports ERC2981')
+
         const royaltyInfoForListing2 = await collection2.royaltyInfo(listing2.nft.tokenID, 100) 
         const royaltyInfoForListing3 = await collection2.royaltyInfo(listing3.nft.tokenID, 100) 
         assert.equal(royaltyInfoForListing2[1].toString(), "3", `royaltyInfo for ${currentListingID + 1} is correct`)

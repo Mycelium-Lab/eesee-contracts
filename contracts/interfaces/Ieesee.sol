@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
-import "./IeeseeNFTMinter.sol";
+import "./IeeseeMinter.sol";
 import "./IRoyaltyEngineV1.sol";
 
 interface Ieesee {
@@ -135,8 +135,8 @@ interface Ieesee {
 
 
     event ChangeMinter(
-        IeeseeNFTMinter indexed previousMinter, 
-        IeeseeNFTMinter indexed newMinter
+        IeeseeMinter indexed previousMinter, 
+        IeeseeMinter indexed newMinter
     );
 
     event ChangeMinDuration(
@@ -187,7 +187,7 @@ interface Ieesee {
 
     function ESE() external view returns(IERC20);
     function rewardPool() external view returns(address);
-    function minter() external view returns(IeeseeNFTMinter);
+    function minter() external view returns(IeeseeMinter);
 
     function minDuration() external view returns(uint256);
     function maxDuration() external view returns(uint256);
