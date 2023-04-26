@@ -1,12 +1,71 @@
 # Solidity API
 
-## ESE
+## eeseeMinter
+
+### publicCollection
+
+```solidity
+contract eeseeNFT publicCollection
+```
+
+_The collection contract NFTs are minted to to save gas._
 
 ### constructor
 
 ```solidity
-constructor(uint256 amount) public
+constructor(string baseURI, string contractURI) public
 ```
+
+### mintToPublicCollection
+
+```solidity
+function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
+```
+
+_Mints {amount} of NFTs to public collection to save gas._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of NFTs to mint. |
+| tokenURIs | string[] | - Metadata URIs of all NFTs minted. |
+| royaltyReceiver | address | -  Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| collection | address | - Address of the collection the NFTs were minted to. |
+| tokenIDs | uint256[] | - IDs of tokens minted. |
+
+### mintToPrivateCollection
+
+```solidity
+function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
+```
+
+_Deploys a sepparate private collection contract and mints {amount} of NFTs to it._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of NFTs to mint. |
+| name | string | - The name for a collection. |
+| symbol | string | - The symbol of the collection. |
+| baseURI | string | - Collection metadata URI. |
+| contractURI | string | - Contract URI for opensea's royalties. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| collection | address | - Address of the collection the NFTs were minted to. |
+| tokenIDs | uint256[] | - IDs of tokens minted. |
 
 ## eeseeNFT
 
@@ -25,6 +84,18 @@ string contractURI
 ```
 
 _Opensea royalty and NFT collection info_
+
+### SetURIForNonexistentToken
+
+```solidity
+error SetURIForNonexistentToken()
+```
+
+### SetRoyaltyForNonexistentToken
+
+```solidity
+error SetRoyaltyForNonexistentToken()
+```
 
 ### constructor
 
@@ -206,73 +277,6 @@ function safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
 function supportsInterface(bytes4 interfaceId) public view returns (bool)
 ```
 
-## eeseeNFTMinter
-
-### publicCollection
-
-```solidity
-contract eeseeNFT publicCollection
-```
-
-_The collection contract NFTs are minted to to save gas._
-
-### constructor
-
-```solidity
-constructor(string baseURI, string contractURI) public
-```
-
-### mintToPublicCollection
-
-```solidity
-function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
-```
-
-_Mints {amount} of NFTs to public collection to save gas._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| amount | uint256 | - Amount of NFTs to mint. |
-| tokenURIs | string[] | - Metadata URIs of all NFTs minted. |
-| royaltyReceiver | address | -  Receiver of royalties from each NFT sale. |
-| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| collection | address | - Address of the collection the NFTs were minted to. |
-| tokenIDs | uint256[] | - IDs of tokens minted. |
-
-### mintToPrivateCollection
-
-```solidity
-function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
-```
-
-_Deploys a sepparate private collection contract and mints {amount} of NFTs to it._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| amount | uint256 | - Amount of NFTs to mint. |
-| name | string | - The name for a collection. |
-| symbol | string | - The symbol of the collection. |
-| baseURI | string | - Collection metadata URI. |
-| contractURI | string | - Contract URI for opensea's royalties. |
-| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
-| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| collection | address | - Address of the collection the NFTs were minted to. |
-| tokenIDs | uint256[] | - IDs of tokens minted. |
-
 ## eesee
 
 ### listings
@@ -302,7 +306,7 @@ _Reward pool {poolFee} fees are sent to._
 ### minter
 
 ```solidity
-contract IeeseeNFTMinter minter
+contract IeeseeMinter minter
 ```
 
 _Contract that mints NFTs_
@@ -396,7 +400,7 @@ _Chainlink VRF V2 request confirmations._
 ### constructor
 
 ```solidity
-constructor(contract IERC20 _ESE, address _rewardPool, contract IeeseeNFTMinter _minter, address _feeCollector, contract IRoyaltyEngineV1 _royaltyEngine, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit) public
+constructor(contract IERC20 _ESE, address _rewardPool, contract IeeseeMinter _minter, address _feeCollector, contract IRoyaltyEngineV1 _royaltyEngine, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit) public
 ```
 
 ### listItem
@@ -727,7 +731,7 @@ function _listItem(struct Ieesee.NFT nft, uint256 maxTickets, uint256 ticketPric
 ### _collectRoyalties
 
 ```solidity
-function _collectRoyalties(address tokenAddress, uint256 tokenID, uint256 value) internal returns (uint256 royaltyAmount)
+function _collectRoyalties(uint256 value, struct Ieesee.NFT nft, address listingOwner) internal returns (uint256 royaltyAmount)
 ```
 
 ### _collectSellFees
@@ -754,7 +758,7 @@ _This function is called by Chainlink. Chooses listing winner and emits {Fulfill
 ### changeMinter
 
 ```solidity
-function changeMinter(contract IeeseeNFTMinter _minter) external
+function changeMinter(contract IeeseeMinter _minter) external
 ```
 
 _Changes minter. Emits {ChangeMinter} event._
@@ -763,7 +767,7 @@ _Changes minter. Emits {ChangeMinter} event._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _minter | contract IeeseeNFTMinter | - New minter. Note: This function can only be called by owner. |
+| _minter | contract IeeseeMinter | - New minter. Note: This function can only be called by owner. |
 
 ### changeMinDuration
 
@@ -862,138 +866,6 @@ _Fund function for Chainlink's VRF V2 subscription._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | amount | uint96 | - Amount of LINK to fund subscription with. |
-
-## eeseePool
-
-### Claim
-
-```solidity
-struct Claim {
-  uint256 rewardID;
-  uint256 balance;
-  bytes32[] merkleProof;
-}
-```
-
-### rewardToken
-
-```solidity
-contract IERC20 rewardToken
-```
-
-_ESE token this contract uses._
-
-### rewardID
-
-```solidity
-uint256 rewardID
-```
-
-_Current reward ID._
-
-### rewardRoot
-
-```solidity
-mapping(uint256 => bytes32) rewardRoot
-```
-
-_Maps {rewardID} to its merkle root._
-
-### isClaimed
-
-```solidity
-mapping(address => mapping(uint256 => bool)) isClaimed
-```
-
-_Has address claimed reward for {rewardID}._
-
-### RewardAdded
-
-```solidity
-event RewardAdded(uint256 rewardID, bytes32 merkleRoot)
-```
-
-### RewardClaimed
-
-```solidity
-event RewardClaimed(uint256 rewardID, address claimer, uint256 amount)
-```
-
-### constructor
-
-```solidity
-constructor(contract IERC20 _rewardToken) public
-```
-
-### claimRewards
-
-```solidity
-function claimRewards(struct eeseePool.Claim[] claims) external
-```
-
-_Claims rewards for multiple {rewardID}s. Emits {RewardClaimed} event for each reward claimed._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| claims | struct eeseePool.Claim[] | - Claim structs. |
-
-### addReward
-
-```solidity
-function addReward(bytes32 merkleRoot) external
-```
-
-_Adds new merkle root and advances to the next {rewardID}. Emits {RewardAdded} event._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| merkleRoot | bytes32 | - Merkle root. |
-
-### getRewards
-
-```solidity
-function getRewards(address claimer, struct eeseePool.Claim[] claims) external view returns (uint256 rewards)
-```
-
-_Verifies {claims} and returns rewards to be claimed from {claims}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| claimer | address | - Address to check. |
-| claims | struct eeseePool.Claim[] | - Claims to check. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| rewards | uint256 | - Rewards to be claimed. |
-
-### verifyClaim
-
-```solidity
-function verifyClaim(address claimer, struct eeseePool.Claim claim) public view returns (bool)
-```
-
-_Verifies {claim} for {claimer}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| claimer | address | - Address to verify claim for. |
-| claim | struct eeseePool.Claim | - Claim to verify. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - Does {claim} exist in merkle root. |
 
 ## IRoyaltyEngineV1
 
@@ -1144,7 +1016,7 @@ event CollectPoolFee(address pool, uint256 amount)
 ### ChangeMinter
 
 ```solidity
-event ChangeMinter(contract IeeseeNFTMinter previousMinter, contract IeeseeNFTMinter newMinter)
+event ChangeMinter(contract IeeseeMinter previousMinter, contract IeeseeMinter newMinter)
 ```
 
 ### ChangeMinDuration
@@ -1204,7 +1076,7 @@ function rewardPool() external view returns (address)
 ### minter
 
 ```solidity
-function minter() external view returns (contract IeeseeNFTMinter)
+function minter() external view returns (contract IeeseeMinter)
 ```
 
 ### minDuration
@@ -1399,7 +1271,7 @@ function changeFeeCollector(address _feeCollector) external
 function fund(uint96 amount) external
 ```
 
-## IeeseeNFTMinter
+## IeeseeMinter
 
 ### publicCollection
 
@@ -1425,52 +1297,5 @@ function mintToPrivateCollection(uint256 amount, string name, string symbol, str
 
 ```solidity
 function getRoyalty(address tokenAddress, uint256 tokenId, uint256 value) public view returns (address payable[] recipients, uint256[] amounts)
-```
-
-## MockVRFCoordinator
-
-### VRF
-
-```solidity
-struct VRF {
-  contract VRFConsumerBaseV2 consumer;
-  uint32 callbackGasLimit;
-}
-```
-
-### counter
-
-```solidity
-uint256 counter
-```
-
-### vrf
-
-```solidity
-mapping(uint256 => struct MockVRFCoordinator.VRF) vrf
-```
-
-### requestRandomWords
-
-```solidity
-function requestRandomWords(bytes32, uint64, uint16, uint32 callbackGasLimit, uint32) external returns (uint256)
-```
-
-### fulfillWords
-
-```solidity
-function fulfillWords(uint256 requestId) external
-```
-
-### createSubscription
-
-```solidity
-function createSubscription() external returns (uint64 subscriptionID)
-```
-
-### addConsumer
-
-```solidity
-function addConsumer(uint64, address) external
 ```
 

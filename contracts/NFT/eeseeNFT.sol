@@ -14,6 +14,9 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     string public URI;
     ///@dev Opensea royalty and NFT collection info
     string public contractURI;
+
+    error SetURIForNonexistentToken();
+    error SetRoyaltyForNonexistentToken();
     
     constructor(
         string memory name,
@@ -24,6 +27,8 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         URI = _URI;
         contractURI = _contractURI;
     }
+
+    // ============ View Functions ============
 
     /**
      * @dev Returns tokenId's token URI. If there is no URI in tokenURIs uses baseURI.
@@ -48,6 +53,8 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         return _nextTokenId();
     }
 
+    // ============ Write Functions ============
+
     /**
      * @dev Mints a {quantity} of NFTs and sends them to the {recipient}.
      * @param recipient - Receiver of NFTs.
@@ -67,6 +74,7 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
      * Note: This function can only be called by owner.
      */
     function setURIForTokenId(uint256 tokenId, string memory _tokenURI) external onlyOwner {
+        if (!_exists(tokenId)) revert SetURIForNonexistentToken();
         tokenURIs[tokenId] = _tokenURI;
     }
 
@@ -90,8 +98,11 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
      * Note: This function can only be called by owner.
      */
     function setRoyaltyForTokenId(uint256 tokenId, address receiver, uint96 feeNumerator) external onlyOwner {
+        if (!_exists(tokenId)) revert SetRoyaltyForNonexistentToken();
         _setTokenRoyalty(tokenId, receiver, feeNumerator);
     }
+
+    // ============ Internal Functions ============
 
     function _startTokenId() internal pure override returns (uint256) {
         return 1;
@@ -100,6 +111,8 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     function _baseURI() internal view override returns (string memory) {
         return URI;
     }
+
+    // ============ onlyAllowedOperatorApproval Overrides ============
 
     function setApprovalForAll(address operator, bool approved) public override onlyAllowedOperatorApproval(operator) {
         super.setApprovalForAll(operator, approved);
@@ -120,6 +133,8 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) payable public override onlyAllowedOperator(from) {
         super.safeTransferFrom(from, to, tokenId, data);
     }
+
+    // ============ supportsInterface ============
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC721A, ERC2981) returns (bool) {
         return ERC721A.supportsInterface(interfaceId) || ERC2981.supportsInterface(interfaceId);

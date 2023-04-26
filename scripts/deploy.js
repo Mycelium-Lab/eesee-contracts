@@ -10,7 +10,7 @@ async function main() {
     const { network, run } = hre
 
     const ESE = await hre.ethers.getContractFactory("ESE");
-    const minter = await hre.ethers.getContractFactory("eeseeNFTMinter");
+    const minter = await hre.ethers.getContractFactory("eeseeMinter");
     const pool = await hre.ethers.getContractFactory("eeseePool");
     const eesee = await hre.ethers.getContractFactory("eesee");
     let args

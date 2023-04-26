@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 
 import "./eeseeNFT.sol";
 
-contract eeseeNFTMinter {
+contract eeseeMinter {
     ///@dev The collection contract NFTs are minted to to save gas.
     eeseeNFT public publicCollection;
 

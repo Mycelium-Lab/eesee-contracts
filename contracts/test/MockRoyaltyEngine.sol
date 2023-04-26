@@ -8,6 +8,8 @@ contract MockRoyaltyEngine {
         view
         returns (address payable[] memory recipients, uint256[] memory amounts)
     {
+        recipients = new address payable[](1);
+        amounts = new uint256[](1);
         (address royaltyReciever, uint256 royaltyAmount) = ERC2981(tokenAddress).royaltyInfo(tokenId, value);
         recipients[0] = payable(royaltyReciever);
         amounts[0] = royaltyAmount;

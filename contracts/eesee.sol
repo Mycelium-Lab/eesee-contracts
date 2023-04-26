@@ -19,7 +19,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     ///@dev Reward pool {poolFee} fees are sent to.
     address public immutable rewardPool;
     ///@dev Contract that mints NFTs
-    IeeseeNFTMinter public minter;
+    IeeseeMinter public minter;
 
     ///@dev Min and max durations for a listing.
     uint256 public minDuration = 1 days;
@@ -53,7 +53,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     constructor(
         IERC20 _ESE,
         address _rewardPool,
-        IeeseeNFTMinter _minter,
+        IeeseeMinter _minter,
         address _feeCollector,
         IRoyaltyEngineV1 _royaltyEngine,
         address _vrfCoordinator, 
@@ -334,7 +334,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
-            _amount -= _collectRoyalties(address(listing.nft.token), listing.nft.tokenID, _amount);
+            _amount -= _collectRoyalties(_amount, listing.nft, listing.owner);
             _amount -= _collectSellFees(_amount, listing.devFee, listing.poolFee);
             amount += _amount;
 
@@ -471,12 +471,15 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         emit ListItem(ID, nft, listing.owner, maxTickets, ticketPrice, duration);
     }
 
-    function _collectRoyalties(address tokenAddress, uint256 tokenID, uint256 value) internal returns(uint256 royaltyAmount) {
-        (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(tokenAddress, tokenID, value);
+    function _collectRoyalties(uint256 value, NFT memory nft, address listingOwner) internal returns(uint256 royaltyAmount) {
+        (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(address(nft.token), nft.tokenID, value);
         for(uint256 i = 0; i < recipients.length; i++){
-            ESE.safeTransfer(recipients[i], amounts[i]);
-            royaltyAmount += amounts[i];
-            emit CollectRoyalty(recipients[i], amounts[i]);
+            //There is no reason to collect royalty from owner if it goes to owner
+            if (recipients[i] != address(0) && recipients[i] != listingOwner && amounts[i] != 0){
+                ESE.safeTransfer(recipients[i], amounts[i]);
+                royaltyAmount += amounts[i];
+                emit CollectRoyalty(recipients[i], amounts[i]);
+            }
         }
     }
 
@@ -521,7 +524,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param _minter - New minter.
      * Note: This function can only be called by owner.
      */
-    function changeMinter(IeeseeNFTMinter _minter) external onlyOwner {
+    function changeMinter(IeeseeMinter _minter) external onlyOwner {
         emit ChangeMinter(minter, _minter);
         minter = _minter;
     }

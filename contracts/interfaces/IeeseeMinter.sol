@@ -3,7 +3,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-interface IeeseeNFTMinter {
+interface IeeseeMinter {
     function publicCollection() external view returns(IERC721);
     function mintToPublicCollection(uint256 amount, string[] memory tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns(IERC721 collection, uint256[] memory tokenIDs);
     function mintToPrivateCollection(
