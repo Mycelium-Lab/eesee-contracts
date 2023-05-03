@@ -8,7 +8,6 @@ const {
   const assert = require("assert");
   describe("eesee", function () {
     let ESE;
-    let pool;
     let mockVRF;
     let eesee;
     let NFT;
@@ -17,14 +16,12 @@ const {
     let minter;
     let royaltyEninge;
     //after one year
-    const timeNow = Math.round((new Date()).getTime() / 1000);
     const zeroAddress = "0x0000000000000000000000000000000000000000"
   
     this.beforeAll(async() => {
         [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector, royaltyCollector] = await ethers.getSigners()
         ticketBuyers = [acc2,acc3, acc4, acc5, acc6,  acc7]
         const _ESE = await hre.ethers.getContractFactory("ESE");
-        const _pool = await hre.ethers.getContractFactory("eeseePool");
         const _mockVRF = await hre.ethers.getContractFactory("MockVRFCoordinator");
         const _eesee = await hre.ethers.getContractFactory("eesee");
         const _NFT = await hre.ethers.getContractFactory("eeseeNFT");
@@ -32,9 +29,6 @@ const {
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
         ESE = await _ESE.deploy('1000000000000000000000000')
         await ESE.deployed()
-        
-        pool = await _pool.deploy(ESE.address)
-        await pool.deployed()
 
         mockVRF = await _mockVRF.deploy()
         await mockVRF.deployed()
@@ -47,7 +41,6 @@ const {
 
         eesee = await _eesee.deploy(
             ESE.address, 
-            pool.address, 
             minter.address, 
             feeCollector.address, 
             royaltyEninge.address, 
@@ -76,26 +69,25 @@ const {
     })
 
     it('Lists NFT', async () => {
-        await expect(eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 1, 2, 86400)).to.be.revertedWith("eesee: Max tickets must be more or equal 2")
-        await expect(eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 100, 0, 86400)).to.be.revertedWith('eesee: Ticket price must be above zero')
-        await expect(eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 100, 0, 86399)).to.be.revertedWith('eesee: Duration must be more or equal minDuration')
-        await expect(eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 100, 0, 2592001)).to.be.revertedWith('eesee: Duration must be less or equal maxDuration')
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 1, 2, 86400)).to.be.revertedWith("eesee: Max tickets must be more or equal 2")
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86400)).to.be.revertedWith('eesee: Ticket price must be above zero')
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86399)).to.be.revertedWith('eesee: Duration must be more or equal minDuration')
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 2592001)).to.be.revertedWith('eesee: Duration must be less or equal maxDuration')
         
         const ID = 1
-        await expect(eesee.connect(signer).listItem({token: NFT.address, tokenID: 1}, 100, 2, 86400))
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 2, 86400))
             .to.emit(eesee, "ListItem")
-            .withArgs(ID, anyValue, signer.address, 100, 2, 86400)//{token: NFT.address, tokenID: 1} produces wrong hash for some reason
+            .withArgs(ID, anyValue, signer.address, 100, 2, 86400)//{collection: NFT.address, tokenID: 1} produces wrong hash for some reason
 
         const listing = await eesee.listings(ID);
         assert.equal(listing.ID.toString(), ID.toString(), "ID is correct")
-        assert.equal(listing.nft.token, NFT.address, "NFT is correct")
+        assert.equal(listing.nft.collection, NFT.address, "NFT is correct")
         assert.equal(listing.nft.tokenID, 1, "NFT tokenID is correct")
         assert.equal(listing.owner, signer.address, "Owner is correct")
         assert.equal(listing.maxTickets, 100, "maxTickets is correct")
         assert.equal(listing.ticketPrice, 2, "ticketPrice is correct")
         assert.equal(listing.ticketsBought, 0, "ticketsBought is correct")
-        assert.equal(listing.devFee, '20000000000000000', "devFee is correct")
-        assert.equal(listing.poolFee, '80000000000000000', "poolFee is correct")
+        assert.equal(listing.fee, '100000000000000000', "fee is correct")
         //assert.equal(listing.creationTime, timeNow, "creationTime is correct")
         assert.equal(listing.duration, 86400, "duration is correct")
         assert.equal(listing.winner, zeroAddress, "winner is correct")
@@ -106,9 +98,9 @@ const {
     it('Batch lists NFT', async () => {
         await expect(eesee.connect(signer).listItems(
             [
-                { token: NFT.address, tokenID: 2 },
-                { token: NFT.address, tokenID: 3 },
-                { token: NFT.address, tokenID: 4 }
+                { collection: NFT.address, tokenID: 2 },
+                { collection: NFT.address, tokenID: 3 },
+                { collection: NFT.address, tokenID: 4 }
             ],
             [
                 50,
@@ -277,7 +269,7 @@ const {
         const listing = await eesee.listings(ID);
         assert.notEqual(listing.winner, zeroAddress, "winner is chosen")
 
-        await recipt.to.emit(eesee, "FulfillListing").withArgs(ID, anyValue, listing.winner)//{token: NFT.address, tokenID: 1} produces wrong hash for some reason
+        await recipt.to.emit(eesee, "FulfillListing").withArgs(ID, anyValue, listing.winner)//{collection: NFT.address, tokenID: 1} produces wrong hash for some reason
     })
 
     //also check batch receive multiple at the same time
@@ -306,26 +298,20 @@ const {
         .to.be.revertedWith("eesee: Caller is not the owner")
 
         const listing = await eesee.listings(ID);
-        const expectedDevFee = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) * BigInt(listing.devFee) / BigInt('1000000000000000000')
-        const expectedPoolFee = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) * BigInt(listing.poolFee) / BigInt('1000000000000000000')
-        const expectedReceive = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) - expectedDevFee - expectedPoolFee
+        const expectedFee = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) * BigInt(listing.fee) / BigInt('1000000000000000000')
+        const expectedReceive = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) - expectedFee
 
         const ownerBalanceBefore = await ESE.balanceOf(signer.address)
         const feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
-        const poolBalanceBefore = await ESE.balanceOf(pool.address)
         await expect(eesee.connect(signer).batchReceiveTokens([ID], signer.address))
         .to.emit(eesee, "ReceiveTokens")
         .withArgs(ID, signer.address, expectedReceive)
-        .and.to.emit(eesee, "CollectDevFee")
-        .withArgs(feeCollector.address, expectedDevFee)
-        .and.to.emit(eesee, "CollectPoolFee")
-        .withArgs(pool.address, expectedPoolFee)
+        .and.to.emit(eesee, "CollectFee")
+        .withArgs(feeCollector.address, expectedFee)
         const ownerBalanceAfter = await ESE.balanceOf(signer.address)
         const feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
-        const poolBalanceAfter = await ESE.balanceOf(pool.address)
 
-        assert.equal(expectedDevFee, BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), "devFee is correct")
-        assert.equal(expectedPoolFee, BigInt(poolBalanceAfter) - BigInt(poolBalanceBefore), "poolFee is correct")
+        assert.equal(expectedFee, BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), "fee is correct")
         assert.equal(expectedReceive, BigInt(ownerBalanceAfter) - BigInt(ownerBalanceBefore), "owner balance is correct")
 
         // reverted with eesee: Listing is not filfilled because listing deleted after previous claim
@@ -451,7 +437,7 @@ const {
         .to.emit(eesee, "ListItem")
         .withArgs(currentListingID, anyValue, acc8.address, 5, 30, 86400)
         const listing1 = await eesee.listings(currentListingID)
-        const collection1 = NFT.attach(listing1.nft.token)
+        const collection1 = NFT.attach(listing1.nft.collection)
         const royaltyInfoForListing1 = await collection1.royaltyInfo(listing1.nft.tokenID, 150) 
         assert.equal(royaltyInfoForListing1[1].toString(), "1", `royaltyInfo for ${currentListingID} is correct`)
         await expect(eesee.connect(acc8).mintAndListItemsWithDeploy(
@@ -472,7 +458,7 @@ const {
 
         const listing2 = await eesee.listings(currentListingID + 1)
         const listing3 = await eesee.listings(currentListingID + 2)
-        const collection2 = NFT.attach(listing2.nft.token)
+        const collection2 = NFT.attach(listing2.nft.collection)
 
         assert.equal(await collection2.name(), "APES", 'collection name is correct')
         assert.equal(await collection2.symbol(), "bayc", 'collection symbol is correct')
@@ -528,22 +514,13 @@ const {
         .withArgs(maxTicketsBoughtByAddress, newValue)
         assert.equal(newValue, await eesee.maxTicketsBoughtByAddress(), "maxTicketsBoughtByAddress has changed")
 
-        const devFee = await eesee.devFee() 
-        await expect(eesee.connect(acc2).changeDevFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
-        //poolFee is 80000000000000000 now so poolFee + devFee > 40%
-        await expect(eesee.connect(signer).changeDevFee('330000000000000000')).to.be.revertedWith("eesee: Can't set fees to more than 40%")
-        await expect(eesee.connect(signer).changeDevFee(newValue))
-        .to.emit(eesee, "ChangeDevFee")
-        .withArgs(devFee, newValue)
-        assert.equal(newValue, await eesee.devFee(), "devFee has changed")
-
-        const poolFee = await eesee.poolFee() 
-        await expect(eesee.connect(acc2).changePoolFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
-        await expect(eesee.connect(signer).changePoolFee('400000000000000000')).to.be.revertedWith("eesee: Can't set fees to more than 40%")
-        await expect(eesee.connect(signer).changePoolFee(newValue))
-        .to.emit(eesee, "ChangePoolFee")
-        .withArgs(poolFee, newValue)
-        assert.equal(newValue, await eesee.poolFee(), "poolFee has changed")
+        const fee = await eesee.fee() 
+        await expect(eesee.connect(acc2).changeFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
+        await expect(eesee.connect(signer).changeFee('400000000000000001')).to.be.revertedWith("eesee: Can't set fees to more than 40%")
+        await expect(eesee.connect(signer).changeFee(newValue))
+        .to.emit(eesee, "ChangeFee")
+        .withArgs(fee, newValue)
+        assert.equal(newValue, await eesee.fee(), "fee has changed")
 
         newValue = zeroAddress
         const _feeCollector = await eesee.feeCollector() 

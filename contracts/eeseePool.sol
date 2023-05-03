@@ -4,8 +4,10 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract eeseePool is Ownable{
+    using SafeERC20 for IERC20;
     /**
      * @dev Claim:
      * {rewardID} - RewardID the tokens are claimed for.
@@ -19,7 +21,7 @@ contract eeseePool is Ownable{
     }
 
     ///@dev ESE token this contract uses.
-    IERC20 public rewardToken;// Don't need safeTransfer
+    IERC20 public rewardToken;
     ///@dev Current reward ID.
     uint256 public rewardID;
     ///@dev Maps {rewardID} to its merkle root.
@@ -53,7 +55,7 @@ contract eeseePool is Ownable{
             require(!isClaimed[msg.sender][claim.rewardID], "eesee: Already claimed");
             isClaimed[msg.sender][claim.rewardID] = true;
 
-            rewardToken.transfer(msg.sender, claim.balance);
+            rewardToken.safeTransfer(msg.sender, claim.balance);
 
             emit RewardClaimed(
                 claim.rewardID,

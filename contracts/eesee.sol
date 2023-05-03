@@ -11,15 +11,15 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     using SafeERC20 for IERC20;
     ///@dev An array of all existing listings.
     Listing[] public listings;
+    ///@dev An array of all existing drops listings.
+    Drop[] public drops;
     ///@dev Maps chainlink request ID to listing ID.
     mapping(uint256 => uint256) private chainlinkRequestIDs;
 
     ///@dev ESE token this contract uses.
     IERC20 public immutable ESE;
-    ///@dev Reward pool {poolFee} fees are sent to.
-    address public immutable rewardPool;
     ///@dev Contract that mints NFTs
-    IeeseeMinter public minter;
+    IeeseeMinter public immutable minter;
 
     ///@dev Min and max durations for a listing.
     uint256 public minDuration = 1 days;
@@ -28,10 +28,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     //Note: Users can still buy 1 ticket even if this check fails. e.g. there is a listing with only 2 tickets and this is set to 20%.
     uint256 public maxTicketsBoughtByAddress = 0.20 ether;
     ///@dev Fee that is collected to {feeCollector} from each fulfilled listing. [1 ether == 100%]
-    uint256 public devFee = 0.02 ether;
-    ///@dev Fee that is collected to {rewardPool} from each fulfilled listing. [1 ether == 100%]
-    uint256 public poolFee = 0.08 ether;
-    ///@dev Address {devFee} fees are sent to.
+    uint256 public fee = 0.10 ether;
+    ///@dev Address {fee}s are sent to.
     address public feeCollector;
 
     ///@dev Chainlink token.
@@ -52,7 +50,6 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     constructor(
         IERC20 _ESE,
-        address _rewardPool,
         IeeseeMinter _minter,
         address _feeCollector,
         IRoyaltyEngineV1 _royaltyEngine,
@@ -63,7 +60,6 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint32 _callbackGasLimit
     ) VRFConsumerBaseV2(_vrfCoordinator) {
         ESE = _ESE;
-        rewardPool = _rewardPool;
         minter = _minter;
         feeCollector = _feeCollector;
         royaltyEngine = _royaltyEngine;
@@ -93,7 +89,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return ID - ID of listing created.
      */
     function listItem(NFT memory nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) external returns(uint256 ID){
-        nft.token.safeTransferFrom(msg.sender, address(this), nft.tokenID);
+        nft.collection.safeTransferFrom(msg.sender, address(this), nft.tokenID);
         ID = _listItem(nft, maxTickets, ticketPrice, duration);
     }
 
@@ -118,7 +114,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         );
         IDs = new uint256[](nfts.length);
         for(uint256 i = 0; i < nfts.length; i++) {
-            nfts[i].token.safeTransferFrom(msg.sender, address(this), nfts[i].tokenID);
+            nfts[i].collection.safeTransferFrom(msg.sender, address(this), nfts[i].tokenID);
             IDs[i] = _listItem(nfts[i], maxTickets[i], ticketPrices[i], durations[i]);
         }
     }
@@ -133,6 +129,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
 
      * @return ID - ID of listing created.
+     * @return collection - Address of NFT collection contract.
      * @return tokenID - ID of token that was minted.
      * Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract
      */
@@ -143,10 +140,12 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, uint256 tokenID){
+    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID){
         string[] memory tokenURIs = new string[](1);
         tokenURIs[0] = tokenURI;
-        (IERC721 collection, uint256[] memory tokenIDs) = minter.mintToPublicCollection(1, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
+        
+        uint256[] memory tokenIDs;
+        (collection, tokenIDs) = minter.mintToPublicCollection(1, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
         tokenID = tokenIDs[0];
         ID = _listItem(NFT(collection, tokenID), maxTickets, ticketPrice, duration);
     }
@@ -161,6 +160,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
      
      * @return IDs - IDs of listings created.
+     * @return collection - Address of NFT collection contract.
      * @return tokenIDs - IDs of tokens that were minted.
      * Note This function costs less than mintAndListItemsWithDeploy() but does not deploy additional NFT collection contract
      */
@@ -171,9 +171,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256[] memory durations,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
+    ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        IERC721 collection;
         (collection, tokenIDs) = minter.mintToPublicCollection(maxTickets.length, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
 
         IDs = new uint256[](maxTickets.length);
@@ -194,6 +193,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
      
      * @return ID - ID of listings created.
+     * @return collection - Address of NFT collection contract.
      * @return tokenID - ID of tokens that were minted.
      * Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract.
      */
@@ -207,8 +207,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, uint256 tokenID){
-        (IERC721 collection, uint256[] memory tokenIDs) = minter.mintToPrivateCollection(1, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
+    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID){
+        uint256[] memory tokenIDs;
+        (collection, tokenIDs) = minter.mintToPrivateCollection(1, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
         tokenID = tokenIDs[0];
         ID = _listItem(NFT(collection, tokenID), maxTickets, ticketPrice, duration);
     }
@@ -225,6 +226,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
      
      * @return IDs - IDs of listings created.
+     * @return collection - Address of NFT collection contract.
      * @return tokenIDs - IDs of tokens that were minted.
      * Note: This is more expensive than mintAndListItems() function but it deploys additional NFT contract.
      */
@@ -238,9 +240,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256[] memory durations,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs){
+    ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs){
         require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
-        IERC721 collection;
         (collection, tokenIDs) = minter.mintToPrivateCollection(maxTickets.length, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
         
         IDs = new uint256[](maxTickets.length);
@@ -286,16 +287,99 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
+     * @dev Deploys new NFT collection and lists it to users for minting. Emits {ListDrop} event.
+     * @param name - Name for a collection.
+     * @param symbol - Collection symbol.
+     * @param URI - URI to store NFT metadata in.
+     * @param contractURI - URI to store collection metadata in.
+     * @param royaltyReceiver - Receiver of royalties from each NFT sale.
+     * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
+     * @param mintLimit - Max amount of NFTs that can be minted.
+     * @param earningsCollector - Address to send NFT sale earnings to.
+     * @param mintStartTimestamp - Timestamp when minting starts.
+     * @param publicStageOptions - Option for public stage.
+     * @param presalesOptions - Options for presales stages.
+
+     * @return ID - ID of a drop created.
+     * @return collection - Address of NFT collection contract.
+     */
+    function listDrop(
+        string memory name,
+        string memory symbol,
+        string memory URI,
+        string memory contractURI,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator,
+        uint256 mintLimit,
+        address earningsCollector,
+        uint256 mintStartTimestamp, 
+        IeeseeNFTDrop.StageOptions memory publicStageOptions,
+        IeeseeNFTDrop.StageOptions[] memory presalesOptions
+    ) external returns (uint256 ID, IERC721 collection){
+        collection = minter.deployDropCollection(
+            name,
+            symbol,
+            URI,
+            contractURI,
+            royaltyReceiver,
+            royaltyFeeNumerator,
+            mintLimit,
+            mintStartTimestamp,
+            publicStageOptions,
+            presalesOptions
+        );
+
+        ID = drops.length;
+        Drop storage drop = drops.push();
+        drop.ID = ID;
+        drop.collection = collection;
+        drop.earningsCollector = earningsCollector;
+        drop.fee = fee;
+
+        emit ListDrop(ID, collection, earningsCollector);
+    }
+
+    /**
+     * @dev Mints NFTs from a drop. Emits {MintDrop} event.
+     * @param ID - ID of a drop to mint NFTs from.
+     * @param quantity - Amount of NFTs to mint.
+     * @param merkleProof - Merkle proof for a user to mint NFTs.
+
+     * @return mintPrice - Amount of ESE tokens spent on minting.
+     */
+    function mintDrop(uint256 ID, uint256 quantity, bytes32[] memory merkleProof) external returns(uint256 mintPrice){
+        require(quantity > 0, "eesee: Quantity must be above zero");
+        Drop storage drop = drops[ID];
+
+        IeeseeNFTDrop _drop = IeeseeNFTDrop(address(drop.collection));
+        uint256 nextTokenId = _drop.nextTokenId();
+        _drop.mint(msg.sender, quantity, merkleProof);
+
+        (,,IeeseeNFTDrop.StageOptions memory stageOptions) = _drop.stages(_drop.getSaleStage()); 
+        uint256 mintFee = stageOptions.mintFee;
+        if (mintFee != 0) {
+            mintPrice = mintFee * quantity;
+            ESE.safeTransferFrom(msg.sender, address(this), mintPrice);
+            uint256 fees = _collectSellFees(mintPrice, drop.fee);
+            ESE.safeTransfer(drop.earningsCollector, mintPrice - fees);
+        }
+
+        for(uint256 i; i < quantity; i++){
+            emit MintDrop(ID, NFT(drop.collection, nextTokenId + i), msg.sender, mintFee);
+        }
+    }
+
+    /**
      * @dev Receive NFTs the sender won from listings. Emits {ReceiveItem} event for each of the NFT received.
      * @param IDs - IDs of listings to claim NFTs in.
      * @param recipient - Address to send NFTs to. 
      
-     * @return tokens - Addresses of tokens received.
+     * @return collections - Addresses of tokens received.
      * @return tokenIDs - IDs of tokens received.
      * Note: Returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
-    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs){
-        tokens = new IERC721[](IDs.length);
+    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
+        collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
         for(uint256 i; i < IDs.length; i++){
@@ -304,10 +388,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             require(listing.winner == msg.sender, "eesee: Caller is not the winner");
             require(!listing.itemClaimed, "eesee: Item has already been claimed");
 
-            tokens[i] = listing.nft.token;
+            collections[i] = listing.nft.collection;
             tokenIDs[i] = listing.nft.tokenID;
             listing.itemClaimed = true;
-            listing.nft.token.safeTransferFrom(address(this), recipient, listing.nft.tokenID);
+            listing.nft.collection.safeTransferFrom(address(this), recipient, listing.nft.tokenID);
 
             emit ReceiveItem(ID, listing.nft, recipient);
 
@@ -335,7 +419,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
             _amount -= _collectRoyalties(_amount, listing.nft, listing.owner);
-            _amount -= _collectSellFees(_amount, listing.devFee, listing.poolFee);
+            _amount -= _collectSellFees(_amount, listing.fee);
             amount += _amount;
 
             emit ReceiveTokens(ID, recipient, _amount);
@@ -353,12 +437,12 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param IDs - IDs of listings to reclaim NFTs in.
      * @param recipient - Address to send NFTs to.
      
-     * @return tokens - Addresses of tokens reclaimed.
+     * @return collections - Addresses of tokens reclaimed.
      * @return tokenIDs - IDs of tokens reclaimed.
      * Note: returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
-    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs){
-        tokens = new IERC721[](IDs.length);
+    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
+        collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
         for(uint256 i; i < IDs.length; i++){
@@ -369,10 +453,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             require(!listing.itemClaimed, "eesee: Item has already been claimed");
             require(listing.winner == address(0), "eesee: Listing is already filfilled");
 
-            tokens[i] = listing.nft.token;
+            collections[i] = listing.nft.collection;
             tokenIDs[i] = listing.nft.tokenID;
             listing.itemClaimed = true;
-            listing.nft.token.safeTransferFrom(address(this), recipient, listing.nft.tokenID);
+            listing.nft.collection.safeTransferFrom(address(this), recipient, listing.nft.tokenID);
 
             emit ReclaimItem(ID, listing.nft, recipient);
 
@@ -425,6 +509,14 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
+     * @dev Get length of the drops array.
+     * @return length - Length of the drops array.
+     */
+    function getDropsLength() external view returns(uint256 length) {
+        length = drops.length;
+    }
+
+    /**
      * @dev Get the buyer of the specified ticket in listing.
      * @param ID - ID of the listing.
      * @param ticket - Ticket index.
@@ -463,8 +555,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         listing.owner = msg.sender;
         listing.maxTickets = maxTickets;
         listing.ticketPrice = ticketPrice;
-        listing.devFee = devFee; // We save fees at the time of listing's creation to not have any control over existing listings' fees
-        listing.poolFee = poolFee; // We save fees at the time of listing's creation to not have any control over existing listings' fees
+        listing.fee = fee; // We save fees at the time of listing's creation to not have any control over existing listings' fees
         listing.creationTime = block.timestamp;
         listing.duration = duration;
 
@@ -472,7 +563,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     function _collectRoyalties(uint256 value, NFT memory nft, address listingOwner) internal returns(uint256 royaltyAmount) {
-        (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(address(nft.token), nft.tokenID, value);
+        (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(address(nft.collection), nft.tokenID, value);
         for(uint256 i = 0; i < recipients.length; i++){
             //There is no reason to collect royalty from owner if it goes to owner
             if (recipients[i] != address(0) && recipients[i] != listingOwner && amounts[i] != 0){
@@ -483,19 +574,11 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         }
     }
 
-    function _collectSellFees(uint256 amount, uint256 _devFee, uint256 _poolFee) internal returns(uint256 feeAmount){
-        uint256 devFeeAmount = amount * _devFee / 1 ether;
-        if(devFeeAmount > 0){
-            ESE.safeTransfer(feeCollector, devFeeAmount);
-            feeAmount += devFeeAmount;
-            emit CollectDevFee(feeCollector, devFeeAmount);
-        }
-
-        uint256 poolFeeAmount = amount * _poolFee / 1 ether;
-        if(poolFeeAmount > 0){
-            ESE.safeTransfer(rewardPool, poolFeeAmount);
-            feeAmount += poolFeeAmount;
-            emit CollectPoolFee(rewardPool, poolFeeAmount);
+    function _collectSellFees(uint256 amount, uint256 _fee) internal returns(uint256 feeAmount){
+        feeAmount = amount * _fee / 1 ether;
+        if(feeAmount > 0){
+            ESE.safeTransfer(feeCollector, feeAmount);
+            emit CollectFee(feeCollector, feeAmount);
         }
     }
 
@@ -518,16 +601,6 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     // ============ Admin Methods ============
-
-    /**
-     * @dev Changes minter. Emits {ChangeMinter} event.
-     * @param _minter - New minter.
-     * Note: This function can only be called by owner.
-     */
-    function changeMinter(IeeseeMinter _minter) external onlyOwner {
-        emit ChangeMinter(minter, _minter);
-        minter = _minter;
-    }
 
     /**
      * @dev Changes minDuration. Emits {ChangeMinDuration} event.
@@ -562,27 +635,15 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
-     * @dev Changes devFee. Emits {ChangeDevFee} event.
-     * @param _devFee - New devFee.
+     * @dev Changes fee. Emits {ChangeFee} event.
+     * @param _fee - New fee.
      * Note: This function can only be called by owner.
      */
-    function changeDevFee(uint256 _devFee) external onlyOwner {
-        require(_devFee + poolFee <= 0.4 ether, "eesee: Can't set fees to more than 40%");
+    function changeFee(uint256 _fee) external onlyOwner {
+        require(_fee <= 0.4 ether, "eesee: Can't set fees to more than 40%");
 
-        emit ChangeDevFee(devFee, _devFee);
-        devFee = _devFee;
-    }
-
-    /**
-     * @dev Changes poolFee. Emits {ChangePoolFee} event.
-     * @param _poolFee - New poolFee.
-     * Note: This function can only be called by owner.
-     */
-    function changePoolFee(uint256 _poolFee) external onlyOwner {
-        require(devFee + _poolFee <= 0.4 ether, "eesee: Can't set fees to more than 40%");
-
-        emit ChangePoolFee(poolFee, _poolFee);
-        poolFee = _poolFee;
+        emit ChangeFee(fee, _fee);
+        fee = _fee;
     }
 
     /**
