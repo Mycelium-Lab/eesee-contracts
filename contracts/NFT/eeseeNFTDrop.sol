@@ -16,7 +16,7 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     ///@dev Opensea royalty and NFT collection info
     string public contractURI;
     address public earningsCollector;
-    address public eeseeFeeCollector;
+    Ieesee public eesee;
     uint256 public eeseeFeeAmount = 0.1 ether;
     uint256 public mintLimit;
     uint256 public mintedAmount;
@@ -46,15 +46,15 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         address _eeseeAddress
     ) ERC721A(name, symbol) {
         URI = _URI;
-        Ieesee eesee = Ieesee(_eeseeAddress);
-        eeseeFeeCollector = eesee.feeCollector();
+        eesee = Ieesee(_eeseeAddress);
         mintLimit = _mintLimit;
         contractURI = _contractURI;
         earningsCollector = _earningsCollector;
         _setDefaultRoyalty(royaltyReceiver, royaltyFeeNumerator);
     }
     event MintOptionsChanged(uint256 mintStartTimestamp, StageOptions publicStageOptions, StageOptions[] presaleStagesOptions);
-
+    event MintLimitChanged(uint256 newMintLimit);
+    event EarningsCollectorChanged(address newEarningsCollector);
     // ============ View Functions ============
 
     /**
@@ -72,9 +72,9 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         }
         return tokenURIs[tokenId];
     }
-    function verifyCanMint (uint8 saleIndex, address claimer, bytes32[] memory merkleProof) public view returns (bool) {
+    function verifyCanMint (uint8 saleStageIndex, address claimer, bytes32[] memory merkleProof) public view returns (bool) {
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(claimer))));
-        return MerkleProof.verify(merkleProof, stages[saleIndex].stageOptions.allowListMerkleRoot, leaf);
+        return MerkleProof.verify(merkleProof, stages[saleStageIndex].stageOptions.allowListMerkleRoot, leaf);
     }
     function getSaleStage() public view returns (uint8 index) {
         for(uint8 i = 0; i < stages.length; i ++) {
@@ -90,37 +90,39 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         require(stages.length > 0, "eeseeNFTDrop: Admin hasn't configured sale settings for this contract yet.");
         require(block.timestamp >= stages[0].startTimestamp, "eeseeNFTDrop: Mint hasn't started yet.");
         require(block.timestamp <= stages[stages.length - 1].endTimestamp || stages[stages.length - 1].endTimestamp == 0, "eeseeNFTDrop: Mint has already ended.");
-        uint8 saleIndex = getSaleStage();
+        uint8 saleStageIndex = getSaleStage();
         require(
-            verifyCanMint(saleIndex, msg.sender, merkleProof) || 
-            stages[saleIndex].stageOptions.allowListMerkleRoot.length == 0, 
+            verifyCanMint(saleStageIndex, msg.sender, merkleProof) || 
+            stages[saleStageIndex].stageOptions.allowListMerkleRoot == bytes32(0), 
             "eeseeNFTDrop: You are not in the allowlist of current sale stage.");
         require(
-            amount + stages[saleIndex].addressMintedAmount[msg.sender] <= stages[saleIndex].stageOptions.perAddressMintLimit || 
-            stages[saleIndex].stageOptions.perAddressMintLimit == 0, 
+            amount + stages[saleStageIndex].addressMintedAmount[msg.sender] <= stages[saleStageIndex].stageOptions.perAddressMintLimit || 
+            stages[saleStageIndex].stageOptions.perAddressMintLimit == 0, 
             "eeseeNFTDrop: You reached address mint limit."
             );
         require(
-            msg.value >= stages[saleIndex].stageOptions.mintFee * amount || 
-            stages[saleIndex].stageOptions.mintFee == 0 && msg.value == 0, 
+            msg.value >= stages[saleStageIndex].stageOptions.mintFee * amount || 
+            stages[saleStageIndex].stageOptions.mintFee == 0 && msg.value == 0, 
             "eeseeNFTDrop: Insufficient funds for this amount."
             );
         require(
-            mintLimit <= mintedAmount + amount ||
+            mintLimit >= mintedAmount + amount ||
             mintLimit == 0, 
             "eeseeNFTDrop: You can't mint more than mint cap."
             );
         _safeMint(msg.sender, amount);
-        stages[saleIndex].addressMintedAmount[msg.sender] += amount;
+        stages[saleStageIndex].addressMintedAmount[msg.sender] += amount;
         mintedAmount += amount;
-        if (stages[saleIndex].stageOptions.mintFee != 0) {
-            uint256 devFee = stages[saleIndex].stageOptions.mintFee * amount * eeseeFeeAmount / 1 ether;
+        if (stages[saleStageIndex].stageOptions.mintFee != 0) {
+            uint256 mintPrice = stages[saleStageIndex].stageOptions.mintFee * amount;
+            uint256 devFee = mintPrice * eeseeFeeAmount / 1 ether;
+            address eeseeFeeCollector = eesee.feeCollector();
             (bool devFeeSent, ) = eeseeFeeCollector.call{value: devFee}("");
             require(devFeeSent, "eeseeNFTDrop: Error while sending fee to eesee fee collector.");
-            (bool profitSent, ) = earningsCollector.call{value: stages[saleIndex].stageOptions.mintFee * amount - devFee}("");
+            (bool profitSent, ) = earningsCollector.call{value: mintPrice - devFee}("");
             require(profitSent, "eeseeNFTDrop: Error while sending fee to earnings address.");
-            if (msg.value > stages[saleIndex].stageOptions.mintFee * amount) {
-                (bool changeSent, ) = msg.sender.call{value: msg.value - stages[saleIndex].stageOptions.mintFee * amount}("");
+            if (msg.value > stages[saleStageIndex].stageOptions.mintFee * amount) {
+                (bool changeSent, ) = msg.sender.call{value: msg.value - mintPrice}("");
                 require(changeSent, "eeseeNFTDrop: Error while sending excess eth.");
             }
         }
@@ -155,11 +157,13 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     function setMintLimit(uint256 _mintLimit) public onlyOwner {
         require(stages.length > 0 && block.timestamp < stages[0].startTimestamp || stages.length == 0, "eeseeNFTDrop: Mint has already started.");
         mintLimit = _mintLimit;
+        emit MintLimitChanged(mintLimit);
     }
 
     function setEarningsCollector (address _earningsCollector) public onlyOwner {
-         require(stages.length > 0 && block.timestamp < stages[0].startTimestamp || stages.length == 0, "eeseeNFTDrop: Mint has already started.");
+        require(stages.length > 0 && block.timestamp < stages[0].startTimestamp || stages.length == 0, "eeseeNFTDrop: Mint has already started.");
         earningsCollector = _earningsCollector;
+        emit EarningsCollectorChanged(earningsCollector);
     }
 
     // ============ Internal Functions ============
