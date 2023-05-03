@@ -15,18 +15,39 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     string public URI;
     ///@dev Opensea royalty and NFT collection info
     string public contractURI;
+    ///@dev 90% of mint fee is sent to this address
     address public earningsCollector;
+    ///@dev Main eesee contract
     Ieesee public eesee;
+    ///@dev Eesee fee amount
     uint256 public eeseeFeeAmount = 0.1 ether;
+    ///@dev Mint cap
     uint256 public mintLimit;
+    ///@dev Current amount of minted nfts
     uint256 public mintedAmount;
+    ///@dev Info about sale stages
     SaleStage[] public stages;
+    /**
+     * @dev SaleStage:
+     * {startTimestamp} - Timestamp when this stage starts.
+     * {endTimestamp} - Timestamp when this stage ends.
+     * {addressMintedAmount} - Amount of nfts minted by address.
+     * {stageOptions} - Additional options for this stage.
+     */
     struct SaleStage {
         uint256 startTimestamp;
         uint256 endTimestamp;
         mapping(address => uint256) addressMintedAmount;
         StageOptions stageOptions;
     }
+    /**
+     * @dev StageOptions:
+     * {name} - Name of a mint stage.
+     * {mintFee} - Price to mint 1 nft.
+     * {duration} - Duration of mint stage.
+     * {perAddressMintLimit} - Mint limit for one address.
+     * {allowListMerkleRoot} - Root of merkle tree for allowlist.
+     */
     struct StageOptions {     
         string name;
         uint256 mintFee;
@@ -37,45 +58,45 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     constructor(
         string memory name,
         string memory symbol,
-        string memory _URI, // URI for unrevealed NFTs
+        string memory _URI, 
         string memory _contractURI,
-        address royaltyReceiver,
-        uint96 royaltyFeeNumerator,
+        RoyaltyInfo memory royaltyInfo,
         uint256 _mintLimit,
         address _earningsCollector,
-        address _eeseeAddress
+        address _eeseeAddress,
+        uint256 mintStartTimestamp,
+        StageOptions memory publicStageOptions,
+        StageOptions[] memory presalesOptions 
     ) ERC721A(name, symbol) {
         URI = _URI;
         eesee = Ieesee(_eeseeAddress);
         mintLimit = _mintLimit;
         contractURI = _contractURI;
         earningsCollector = _earningsCollector;
-        _setDefaultRoyalty(royaltyReceiver, royaltyFeeNumerator);
+        _setDefaultRoyalty(royaltyInfo.receiver, royaltyInfo.royaltyFraction);
+        setMintStageOptions(mintStartTimestamp, publicStageOptions, presalesOptions);
     }
     event MintOptionsChanged(uint256 mintStartTimestamp, StageOptions publicStageOptions, StageOptions[] presaleStagesOptions);
     event MintLimitChanged(uint256 newMintLimit);
     event EarningsCollectorChanged(address newEarningsCollector);
     // ============ View Functions ============
-
     /**
-     * @dev Returns tokenId's token URI. If there is no URI in tokenURIs uses baseURI.
-     * @param tokenId - Token ID to check.
+     * @dev Verifies that a user is in allowlist of saleStageIndex sale stage
+     * @param saleStageIndex - Index of the sale stage
+     * @param claimer - Address of a user
+     * @param merkleProof - Merkle proof of stage's merkle tree
      
-     * @return string Token URI.
+     * @return Returns true if user in stage's allowlist
      */
-    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-        if (!_exists(tokenId)) revert URIQueryForNonexistentToken();
-        bytes memory str = bytes(tokenURIs[tokenId]);
-        if(str.length == 0){
-            string memory baseURI = _baseURI();
-            return bytes(baseURI).length != 0 ? baseURI : '';
-        }
-        return tokenURIs[tokenId];
-    }
     function verifyCanMint (uint8 saleStageIndex, address claimer, bytes32[] memory merkleProof) public view returns (bool) {
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(claimer))));
         return MerkleProof.verify(merkleProof, stages[saleStageIndex].stageOptions.allowListMerkleRoot, leaf);
     }
+    /**
+     * @dev Returns current sale stages index
+     
+     * @return index - Index of current sale stage
+     */
     function getSaleStage() public view returns (uint8 index) {
         for(uint8 i = 0; i < stages.length; i ++) {
             if (block.timestamp >= stages[i].startTimestamp && (block.timestamp <= stages[i].endTimestamp || stages[i].endTimestamp == 0)) {
@@ -85,7 +106,11 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         return 0;
     }
     // ============ Write Functions ============
-
+    /**
+     * @dev Mints nfts for transaction sender
+     * @param amount - Amount of nfts to mint
+     * @param merkleProof - Merkle tree proof of transaction sender's address
+     */
     function mint(uint256 amount, bytes32[] memory merkleProof) external payable {
         require(stages.length > 0, "eeseeNFTDrop: Admin hasn't configured sale settings for this contract yet.");
         require(block.timestamp >= stages[0].startTimestamp, "eeseeNFTDrop: Mint hasn't started yet.");
@@ -127,6 +152,12 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
             }
         }
     }
+    /**
+     * @dev Sets options for mint stages
+     * @param mintStartTimestamp - Mint start time
+     * @param publicStageOptions - Options for public stage
+     * @param presalesOptions - Options for presale stages 
+     */
     function setMintStageOptions(uint256 mintStartTimestamp, StageOptions memory publicStageOptions, StageOptions[] memory presalesOptions) public onlyOwner{
         require(block.timestamp < mintStartTimestamp, "eeseeNFTDrop: Mint start timestamp must be in the future.");
         require(presalesOptions.length <= 5, "eeseeNFTDrop: Maximum amount of presale stages is 5.");
@@ -153,13 +184,19 @@ contract eeseeNFTDrop is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         }
         emit MintOptionsChanged(mintStartTimestamp, publicStageOptions, presalesOptions);
     }
-
+    /**
+     * @dev Sets new mint limit cap
+     * @param _mintLimit - New mint limit
+     */
     function setMintLimit(uint256 _mintLimit) public onlyOwner {
         require(stages.length > 0 && block.timestamp < stages[0].startTimestamp || stages.length == 0, "eeseeNFTDrop: Mint has already started.");
         mintLimit = _mintLimit;
         emit MintLimitChanged(mintLimit);
     }
-
+    /**
+     * @dev Sets new earnings collector address
+     * @param _earningsCollector - New earnings collector address
+     */
     function setEarningsCollector (address _earningsCollector) public onlyOwner {
         require(stages.length > 0 && block.timestamp < stages[0].startTimestamp || stages.length == 0, "eeseeNFTDrop: Mint has already started.");
         earningsCollector = _earningsCollector;

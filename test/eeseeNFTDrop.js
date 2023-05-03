@@ -124,19 +124,7 @@ const {
             50000//callbackGasLimit
         )
         await eesee.deployed()
-        eeseeNFTDrop = await _eeseeNFTDrop.deploy(
-            'ABCDFG',
-            'ABC',
-            '/',
-            '/',
-            royaltyCollector.address,
-            300,
-            35, 
-            earningsCollector.address,
-            eesee.address
-        )
-        await eeseeNFTDrop.deployed()
-
+        currentTimestamp = (await ethers.provider.getBlock()).timestamp;
         for (let j = 0; j < 9; j ++) {
             const wallet = ethers.Wallet.createRandom().connect(ethers.provider)
             leaves.push([
@@ -146,9 +134,20 @@ const {
         leaves.push([acc2.address])
         merkleTreeOfPresale1 = StandardMerkleTree.of(leaves, ['address'])
         presaleStages[0].allowListMerkleRoot = merkleTreeOfPresale1.root
-    })
-    it('Can\'t mint if mint stages are not set', async () => {
-        await expect(eeseeNFTDrop.connect(acc2).mint(10, [])).to.be.revertedWith('eeseeNFTDrop: Admin hasn\'t configured sale settings for this contract yet.')
+        eeseeNFTDrop = await _eeseeNFTDrop.deploy(
+            'ABCDFG',
+            'ABC',
+            '/',
+            '/',
+            { receiver: royaltyCollector.address, royaltyFraction: 300 },
+            35, 
+            earningsCollector.address,
+            eesee.address,
+            currentTimestamp + 86400,
+            publicStage,
+            presaleStages
+        )
+        await eeseeNFTDrop.deployed()
     })
     it('Owner can set mint options', async () => {
         currentTimestamp = (await ethers.provider.getBlock()).timestamp;
