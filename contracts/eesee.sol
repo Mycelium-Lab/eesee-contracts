@@ -73,8 +73,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         minimumRequestConfirmations = _minimumRequestConfirmations;
         callbackGasLimit = _callbackGasLimit;
 
-        //Create dummy listing at index 0
+        //Create dummy listings at index 0
         listings.push();
+        drops.push();
     }
 
     // ============ External Methods ============

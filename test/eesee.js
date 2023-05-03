@@ -6,6 +6,7 @@ const {
   const { expect } = require("chai");
   const { ethers, network } = require("hardhat");
   const assert = require("assert");
+  const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
   describe("eesee", function () {
     let ESE;
     let mockVRF;
@@ -529,5 +530,103 @@ const {
         .to.emit(eesee, "ChangeFeeCollector")
         .withArgs(_feeCollector, newValue)
         assert.equal(newValue, await eesee.feeCollector(), "feeCollector has changed")
+    })
+
+    const getProof = (tree, address) => {
+        let proof = null
+        for (const [i, v] of tree.entries()) {
+            if (v[0] === address) {
+                proof = tree.getProof(i);
+              }
+        }
+        return proof
+    }
+    
+    it('drops', async () => {
+        const eeseeNFTDrop = await hre.ethers.getContractFactory("eeseeNFTDrop")
+        const leaves = []
+        leaves.push([acc2.address])
+        leaves.push([acc3.address])
+        leaves.push([acc8.address])
+        merkleTree = StandardMerkleTree.of(leaves, ['address'])
+        const publicStage = {
+            name: 'Public Stage',
+            mintFee: ethers.utils.parseUnits('0.03', 'ether'),
+            duration: 86400,
+            perAddressMintLimit: 0,
+            allowListMerkleRoot: '0x0000000000000000000000000000000000000000000000000000000000000000'
+        }
+        const presaleStages = [
+            {
+                name: 'Presale Stage 1',
+                mintFee: 0,
+                duration: 86400,
+                perAddressMintLimit: 5,
+                allowListMerkleRoot: merkleTree.root
+            },
+            {
+                name: 'Presale Stage 2',
+                mintFee: ethers.utils.parseUnits('0.02', 'ether'),
+                duration: 86400,
+                perAddressMintLimit: 5,
+                allowListMerkleRoot: merkleTree.root
+            }
+        ]
+
+        await expect(eesee.connect(acc8).listDrop(
+            'apes',
+            'bayc',
+            'base/',
+            'contract/',
+            acc8.address,
+            300,
+            10,
+            acc8.address,
+            (await ethers.provider.getBlock()).timestamp + 86400,
+            publicStage,
+            presaleStages
+        ))
+        .to.emit(eesee, "ListDrop")
+        .withArgs(1, anyValue, acc8.address)
+
+        const ID = 1
+        const listing = await eesee.drops(ID);
+        assert.equal(listing.ID.toString(), ID.toString(), "ID is correct")
+        assert.equal(listing.earningsCollector, acc8.address, "earningsCollector is correct")
+        assert.equal(listing.fee.toString(), (await eesee.fee()).toString(), "Fee is correct")
+
+        assert.equal(await eesee.getDropsLength(), 2, "Length is correct")
+
+        await expect(eesee.connect(acc2).mintDrop(
+            1, 2, getProof(merkleTree, acc2.address)
+        )).to.be.revertedWithCustomError(eeseeNFTDrop, "MintingNotStarted")
+
+        // Presale 1
+        await time.increase(86401)
+
+        await expect(eesee.connect(acc3).mintDrop(
+            1, 2, getProof(merkleTree, acc3.address)
+        )).to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc3.address, 0)
+
+        const invalidMerkleTree = StandardMerkleTree.of([[acc4.address]], ['address'])
+        await expect(eesee.connect(acc4).mintDrop(
+            1, 2, getProof(invalidMerkleTree, acc4.address)
+        )).to.be.revertedWithCustomError(eeseeNFTDrop, "NotInAllowlist")
+
+        // Presale 2
+        await time.increase(86401)
+        await expect(eesee.connect(acc2).mintDrop(
+            1, 2, getProof(merkleTree, acc2.address)
+        ))
+        .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc2.address, ethers.utils.parseUnits('0.02', 'ether'))
+        .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc2.address, ethers.utils.parseUnits('0.02', 'ether'))
+
+        // Presale 3
+        await time.increase(86401)
+        await expect(eesee.connect(acc4).mintDrop(
+            1, 2, getProof(invalidMerkleTree, acc4.address)
+        ))
+        .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc4.address, ethers.utils.parseUnits('0.03', 'ether'))
+        .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc4.address, ethers.utils.parseUnits('0.03', 'ether'))
     })
 });
