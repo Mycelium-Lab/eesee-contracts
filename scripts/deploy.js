@@ -19,7 +19,8 @@ async function main() {
     await _ESE.deployTransaction.wait(6);
     await run("verify:verify", {
         address: _ESE.address,
-        constructorArguments: args
+        constructorArguments: args,
+        contract: "contracts/ESE.sol:ESE"
     })
 
     args = ['','']//TODO
