@@ -520,10 +520,10 @@ function _listItem(struct Ieesee.NFT nft, uint256 maxTickets, uint256 ticketPric
 function _collectRoyalties(uint256 value, struct Ieesee.NFT nft, address listingOwner) internal returns (uint256 royaltyAmount)
 ```
 
-### _collectSellFees
+### _collectFee
 
 ```solidity
-function _collectSellFees(uint256 amount, uint256 _fee) internal returns (uint256 feeAmount)
+function _collectFee(uint256 amount, uint256 _fee) internal returns (uint256 feeAmount)
 ```
 
 ### fulfillRandomWords

@@ -317,6 +317,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         IeeseeNFTDrop.StageOptions memory publicStageOptions,
         IeeseeNFTDrop.StageOptions[] memory presalesOptions
     ) external returns (uint256 ID, IERC721 collection){
+        require(earningsCollector != address(0), "eesee: Invalid earningsCollector");
         collection = minter.deployDropCollection(
             name,
             symbol,
@@ -361,7 +362,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         if (mintFee != 0) {
             mintPrice = mintFee * quantity;
             ESE.safeTransferFrom(msg.sender, address(this), mintPrice);
-            uint256 fees = _collectSellFees(mintPrice, drop.fee);
+            uint256 fees = _collectFee(mintPrice, drop.fee);
             ESE.safeTransfer(drop.earningsCollector, mintPrice - fees);
         }
 
@@ -380,6 +381,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: Returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
     function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
+        require(recipient != address(0), "eesee: Invalid recipient");
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
@@ -410,6 +412,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return amount - ESE received.
      */
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
+        require(recipient != address(0), "eesee: Invalid recipient");
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
@@ -420,7 +423,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
             _amount -= _collectRoyalties(_amount, listing.nft, listing.owner);
-            _amount -= _collectSellFees(_amount, listing.fee);
+            _amount -= _collectFee(_amount, listing.fee);
             amount += _amount;
 
             emit ReceiveTokens(ID, recipient, _amount);
@@ -443,6 +446,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
     function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
+        require(recipient != address(0), "eesee: Invalid recipient");
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
@@ -475,6 +479,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return amount - ESE received.
      */
     function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
+        require(recipient != address(0), "eesee: Invalid recipient");
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
@@ -575,7 +580,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         }
     }
 
-    function _collectSellFees(uint256 amount, uint256 _fee) internal returns(uint256 feeAmount){
+    function _collectFee(uint256 amount, uint256 _fee) internal returns(uint256 feeAmount){
+        if(feeCollector == address(0)){
+            return 0;
+        }
         feeAmount = amount * _fee / 1 ether;
         if(feeAmount > 0){
             ESE.safeTransfer(feeCollector, feeAmount);

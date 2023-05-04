@@ -265,7 +265,7 @@ const {
 
     it('Selects winner', async () => {
         const ID = 1
-        const recipt = expect(mockVRF.fulfillWords(0))
+        const recipt = expect(await mockVRF.fulfillWords(0))
 
         const listing = await eesee.listings(ID);
         assert.notEqual(listing.winner, zeroAddress, "winner is chosen")
@@ -543,6 +543,8 @@ const {
     }
     
     it('drops', async () => {
+        await eesee.connect(signer).changeFee('100000000000000000')
+        await expect(eesee.connect(signer).changeFeeCollector(feeCollector.address))
         const eeseeNFTDrop = await hre.ethers.getContractFactory("eeseeNFTDrop")
         const leaves = []
         leaves.push([acc2.address])
@@ -601,12 +603,23 @@ const {
             1, 2, getProof(merkleTree, acc2.address)
         )).to.be.revertedWithCustomError(eeseeNFTDrop, "MintingNotStarted")
 
+
         // Presale 1
         await time.increase(86401)
 
+        let balanceBefore = await ESE.balanceOf(acc2.address)
+        let collectorBalanceBefore = await ESE.balanceOf(acc8.address)
+        let feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
         await expect(eesee.connect(acc3).mintDrop(
             1, 2, getProof(merkleTree, acc3.address)
         )).to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc3.address, 0)
+        let balanceAfter = await ESE.balanceOf(acc2.address)
+        let collectorBalanceAfter = await ESE.balanceOf(acc8.address)
+        let feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
+
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 0, "Price paid is correct")
+        assert.equal(BigInt(collectorBalanceBefore) - BigInt(collectorBalanceAfter), 0, "Amount collected is correct")
+        assert.equal(BigInt(feeBalanceBefore) - BigInt(feeBalanceAfter), 0, "Fee is correct")
 
         const invalidMerkleTree = StandardMerkleTree.of([[acc4.address]], ['address'])
         await expect(eesee.connect(acc4).mintDrop(
@@ -615,18 +628,53 @@ const {
 
         // Presale 2
         await time.increase(86401)
+        let expectedFee = BigInt(ethers.utils.parseUnits('0.04', 'ether')) * BigInt(listing.fee) / BigInt('1000000000000000000')
+
+        balanceBefore = await ESE.balanceOf(acc2.address)
+        collectorBalanceBefore = await ESE.balanceOf(acc8.address)
+        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
         await expect(eesee.connect(acc2).mintDrop(
             1, 2, getProof(merkleTree, acc2.address)
         ))
-        .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc2.address, ethers.utils.parseUnits('0.02', 'ether'))
-        .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc2.address, ethers.utils.parseUnits('0.02', 'ether'))
+        .to.emit(eesee, "CollectFee").withArgs(feeCollector.address, expectedFee)
+        .and.to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc2.address, ethers.utils.parseUnits('0.02', 'ether'))
+        .and.to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc2.address, ethers.utils.parseUnits('0.02', 'ether'))
+
+        balanceAfter = await ESE.balanceOf(acc2.address)
+        collectorBalanceAfter = await ESE.balanceOf(acc8.address)
+        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
+
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), ethers.utils.parseUnits('0.04', 'ether'), "Price paid is correct")
+        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), expectedFee, "Fee is correct")
+
+        let expectedReceive = BigInt(ethers.utils.parseUnits('0.04', 'ether')) - expectedFee
+        assert.equal(BigInt(collectorBalanceAfter) - BigInt(collectorBalanceBefore), expectedReceive, "Amount collected is correct")
+
+        await expect(eesee.connect(acc4).mintDrop(
+            1, 2, getProof(merkleTree, acc2.address)
+        )).to.be.revertedWithCustomError(eeseeNFTDrop, "NotInAllowlist")
 
         // Presale 3
         await time.increase(86401)
+        expectedFee = BigInt(ethers.utils.parseUnits('0.06', 'ether')) * BigInt(listing.fee) / BigInt('1000000000000000000')
+        balanceBefore = await ESE.balanceOf(acc4.address)
+        collectorBalanceBefore = await ESE.balanceOf(acc8.address)
+        feeBalanceBefore = await ESE.balanceOf(feeCollector.address)
         await expect(eesee.connect(acc4).mintDrop(
             1, 2, getProof(invalidMerkleTree, acc4.address)
         ))
         .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc4.address, ethers.utils.parseUnits('0.03', 'ether'))
-        .to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc4.address, ethers.utils.parseUnits('0.03', 'ether'))
+        .and.to.emit(eesee, "MintDrop").withArgs(1, anyValue, acc4.address, ethers.utils.parseUnits('0.03', 'ether'))
+        .and.to.emit(eesee, "CollectFee").withArgs(feeCollector.address, expectedFee)
+        
+        balanceAfter = await ESE.balanceOf(acc4.address)
+        collectorBalanceAfter = await ESE.balanceOf(acc8.address)
+        feeBalanceAfter = await ESE.balanceOf(feeCollector.address)
+
+        assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), ethers.utils.parseUnits('0.06', 'ether'), "Price paid is correct")
+        assert.equal(BigInt(feeBalanceAfter) - BigInt(feeBalanceBefore), expectedFee, "Fee is correct")
+
+        expectedReceive = BigInt(ethers.utils.parseUnits('0.06', 'ether')) - expectedFee
+        assert.equal(BigInt(collectorBalanceAfter) - BigInt(collectorBalanceBefore), expectedReceive, "Amount collected is correct")
     })
 });
