@@ -3,6 +3,8 @@
 pragma solidity 0.8.17;
 
 import "./eeseeNFT.sol";
+import "./eeseeNFTDrop.sol";
+import "../interfaces/IeeseeMinter.sol";
 
 contract eeseeMinter {
     ///@dev The collection contract NFTs are minted to to save gas.
@@ -70,5 +72,48 @@ contract eeseeMinter {
             tokenIDs[i] = i + startTokenId;
         }
         collection = address(privateCollection);
+    }
+
+    /**
+     * @dev Deploys a new drop collection contract.
+     * @param name - The name for a collection.
+     * @param symbol - The symbol of the collection.
+     * @param URI - Collection metadata URI.
+     * @param contractURI - Contract URI for opensea's royalties.
+     * @param royaltyReceiver - Receiver of royalties from each NFT sale.
+     * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
+     * @param mintLimit - NFT mint cap
+     * @param mintStartTimestamp - Mint start timestamp
+     * @param publicStageOptions - Option for the public NFT sale
+     * @param presalesOptions - Options for the NFT presales 
+
+     * @return collection - Drops collection address
+     */
+    function deployDropCollection(
+        string memory name, 
+        string memory symbol, 
+        string memory URI,
+        string memory contractURI,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator,
+        uint256 mintLimit,
+        uint256 mintStartTimestamp, 
+        IeeseeNFTDrop.StageOptions memory publicStageOptions,
+        IeeseeNFTDrop.StageOptions[] memory presalesOptions
+    ) external returns(address collection){
+        eeseeNFTDrop dropCollection = new eeseeNFTDrop(
+            name,
+            symbol,
+            URI,
+            contractURI,
+            royaltyReceiver,
+            royaltyFeeNumerator,
+            mintLimit,
+            mintStartTimestamp,
+            publicStageOptions,
+            presalesOptions
+        );
+        dropCollection.transferOwnership(msg.sender);
+        collection = address(dropCollection);
     }
 }

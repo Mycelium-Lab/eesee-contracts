@@ -15,7 +15,7 @@ interface Ieesee {
      * {tokenID} - Token ID of NFT. 
      */
     struct NFT {
-        IERC721 token;
+        IERC721 collection;
         uint256 tokenID;
     }
 
@@ -29,8 +29,7 @@ interface Ieesee {
      * {ticketsBoughtByAddress} - Amount of tickets bought by address.
      * {ticketPrice} - Price of a single ticket.
      * {ticketsBought} - Amount of tickets bought.
-     * {devFee} - Fee sent to {feeCollector}.
-     * {poolFee} - Fee sent to {rewardPool}.
+     * {fee} - Fee sent to {feeCollector}.
      * {creationTime} - Listing creation time.
      * {duration} - Listing duration.
      * {winner} - Selected winner.
@@ -46,8 +45,7 @@ interface Ieesee {
         mapping(address => uint256) ticketsBoughtByAddress;
         uint256 ticketPrice;
         uint256 ticketsBought;
-        uint256 devFee;
-        uint256 poolFee;
+        uint256 fee;
         uint256 creationTime;
         uint256 duration;
         address winner;
@@ -55,12 +53,20 @@ interface Ieesee {
         bool tokensClaimed;
     }
 
-    struct Item {
-        NFT nft;
-        uint256 maxTickets;
-        uint256 ticketPrice;
-        uint256 duration;
+    /**
+     * @dev Drop:
+     * {ID} - Id of the Drop, starting from 1.
+     * {collection} - IERC721 contract address.
+     * {earningsCollector} - Address that collects earnings from this drop.
+     * {fee} - Fee sent to {feeCollector}.
+     */
+    struct Drop {
+        uint256 ID;
+        IERC721 collection;
+        address earningsCollector;
+        uint256 fee;
     }
+
     event ListItem(
         uint256 indexed ID,
         NFT indexed nft,
@@ -123,21 +129,11 @@ interface Ieesee {
         uint256 amount
     );
 
-    event CollectDevFee(
+    event CollectFee(
         address indexed to,
         uint256 amount
     );
 
-    event CollectPoolFee(
-        address indexed pool,
-        uint256 amount
-    );
-
-
-    event ChangeMinter(
-        IeeseeMinter indexed previousMinter, 
-        IeeseeMinter indexed newMinter
-    );
 
     event ChangeMinDuration(
         uint256 indexed previousMinDuration,
@@ -154,19 +150,26 @@ interface Ieesee {
         uint256 indexed newMaxTicketsBoughtByAddress
     );
 
-    event ChangeDevFee(
-        uint256 indexed previousDevFee, 
-        uint256 indexed newDevFee
-    );
-
-    event ChangePoolFee(
-        uint256 indexed previousPoolFee, 
-        uint256 indexed newPoolFee
+    event ChangeFee(
+        uint256 indexed previousFee, 
+        uint256 indexed newFee
     );
 
     event ChangeFeeCollector(
         address indexed previousFeeColector, 
         address indexed newFeeCollector
+    );
+
+    event ListDrop(
+        uint256 indexed ID, 
+        IERC721 indexed collection, 
+        address indexed earningsCollector
+    );
+    event MintDrop(
+        uint256 indexed ID, 
+        NFT indexed nft,
+        address indexed sender,
+        uint256 mintFee
     );
 
     function listings(uint256) external view returns(
@@ -176,24 +179,28 @@ interface Ieesee {
         uint256 maxTickets,
         uint256 ticketPrice,
         uint256 ticketsBought,
-        uint256 devFee,
-        uint256 poolFee,
+        uint256 fee,
         uint256 creationTime,
         uint256 duration,
         address winner,
         bool itemClaimed,
-        bool tokensClaime
+        bool tokensClaimed
+    );
+
+    function drops(uint256) external view returns(
+        uint256 ID,
+        IERC721 collection,
+        address earningsCollector,
+        uint256 fee
     );
 
     function ESE() external view returns(IERC20);
-    function rewardPool() external view returns(address);
     function minter() external view returns(IeeseeMinter);
 
     function minDuration() external view returns(uint256);
     function maxDuration() external view returns(uint256);
     function maxTicketsBoughtByAddress() external view returns(uint256);
-    function devFee() external view returns(uint256);
-    function poolFee() external view returns(uint256);
+    function fee() external view returns(uint256);
     function feeCollector() external view returns(address);
 
     function LINK() external view returns(LinkTokenInterface);
@@ -222,7 +229,7 @@ interface Ieesee {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, uint256 tokenID);
+    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID);
     function mintAndListItems(
         string[] memory tokenURIs, 
         uint256[] memory maxTickets, 
@@ -230,7 +237,7 @@ interface Ieesee {
         uint256[] memory durations,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs);
+    ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs);
 
     function mintAndListItemWithDeploy(
         string memory name, 
@@ -242,7 +249,7 @@ interface Ieesee {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, uint256 tokenID);
+    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID);
     function mintAndListItemsWithDeploy(
         string memory name, 
         string memory symbol, 
@@ -253,14 +260,29 @@ interface Ieesee {
         uint256[] memory durations,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256[] memory IDs, uint256[] memory tokenIDs);
+    ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs);
 
     function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent);
 
-    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs);
+    function listDrop(
+        string memory name,
+        string memory symbol,
+        string memory URI,
+        string memory contractURI,
+        address royaltyReceiver,
+        uint96 royaltyFeeNumerator,
+        uint256 mintLimit,
+        address earningsCollector,
+        uint256 mintStartTimestamp, 
+        IeeseeNFTDrop.StageOptions memory publicStageOptions,
+        IeeseeNFTDrop.StageOptions[] memory presalesOptions
+    ) external returns (uint256 ID, IERC721 collection);
+    function mintDrop(uint256 ID, uint256 quantity, bytes32[] memory merkleProof) external returns(uint256 mintPrice);
+
+    function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs);
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
-    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory tokens, uint256[] memory tokenIDs);
+    function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs);
     function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
     function getListingsLength() external view returns(uint256 length);
@@ -270,8 +292,7 @@ interface Ieesee {
     function changeMinDuration(uint256 _minDuration) external;
     function changeMaxDuration(uint256 _maxDuration) external;
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external;
-    function changeDevFee(uint256 _devFee) external;
-    function changePoolFee(uint256 _poolFee) external;
+    function changeFee(uint256 _fee) external;
     function changeFeeCollector(address _feeCollector) external;
 
     function fund(uint96 amount) external;

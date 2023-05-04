@@ -126,14 +126,6 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
         super.transferFrom(from, to, tokenId);
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId) payable public override onlyAllowedOperator(from) {
-        super.safeTransferFrom(from, to, tokenId);
-    }
-
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) payable public override onlyAllowedOperator(from) {
-        super.safeTransferFrom(from, to, tokenId, data);
-    }
-
     // ============ supportsInterface ============
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC721A, ERC2981) returns (bool) {

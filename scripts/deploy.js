@@ -19,7 +19,8 @@ async function main() {
     await _ESE.deployTransaction.wait(6);
     await run("verify:verify", {
         address: _ESE.address,
-        constructorArguments: args
+        constructorArguments: args,
+        contract: "contracts/ESE.sol:ESE"
     })
 
     args = ['','']//TODO
@@ -43,7 +44,6 @@ async function main() {
         //goerli testnet
         args = [
             _ESE.address, 
-            _pool.address, 
             _minter.address,
             '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', 
             '0xe7c9Cb6D966f76f3B5142167088927Bf34966a1f',//royaltyEngine
@@ -56,7 +56,6 @@ async function main() {
     }else if(network.name === 'ethereum'){
         args = [
             _ESE.address, 
-            _pool.address, 
             _minter.address,
             '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', //TODO
             '0x0385603ab55642cb4Dd5De3aE9e306809991804f',//royaltyEngine
@@ -69,7 +68,6 @@ async function main() {
     }else if(network.name === 'polygon'){
         args = [
             _ESE.address, 
-            _pool.address,
             _minter.address, 
             '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', //TODO
             '0x28EdFcF0Be7E86b07493466e7631a213bDe8eEF2',//royaltyEngine

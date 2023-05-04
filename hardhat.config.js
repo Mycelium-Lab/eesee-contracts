@@ -8,7 +8,7 @@ module.exports = {
     apiKey: process.env.ETHERSCAN,
   },
   contractSizer: {
-    runOnCompile: true,
+    runOnCompile: false,
   },
   networks: {
     testnet: {
@@ -36,7 +36,7 @@ module.exports = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 10000,
+        runs: 1650,
       },
     },
   },
