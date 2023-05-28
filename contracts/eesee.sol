@@ -2,19 +2,18 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/Ieesee.sol";
+import '@axelar-network/axelar-gmp-sdk-solidity/contracts/executable/AxelarExecutable.sol';
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
+contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
     using SafeERC20 for IERC20;
     ///@dev An array of all existing listings.
     Listing[] public listings;
     ///@dev An array of all existing drops listings.
     Drop[] public drops;
-    ///@dev Maps chainlink request ID to listing ID.
-    mapping(uint256 => uint256) private chainlinkRequestIDs;
 
     ///@dev ESE token this contract uses.
     IERC20 public immutable ESE;
@@ -23,6 +22,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     ///@dev Min and max durations for a listing.
     uint256 public minDuration = 1 days;
+    //TODO: this is too long
     uint256 public maxDuration = 30 days;
     ///@dev Max tickets bought by a single address in a single listing. [1 ether == 100%]
     //Note: Users can still buy 1 ticket even if this check fails. e.g. there is a listing with only 2 tickets and this is set to 20%.
@@ -32,46 +32,44 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     ///@dev Address {fee}s are sent to.
     address public feeCollector;
 
-    ///@dev Chainlink token.
-    LinkTokenInterface immutable public LINK;
-    ///@dev Chainlink VRF V2 coordinator.
-    VRFCoordinatorV2Interface immutable public vrfCoordinator;
-    ///@dev Chainlink VRF V2 subscription ID.
-    uint64 immutable public subscriptionID;
-    ///@dev Chainlink VRF V2 key hash to call requestRandomWords() with.
-    bytes32 immutable public keyHash;
-    ///@dev Chainlink VRF V2 request confirmations.
-    uint16 immutable public minimumRequestConfirmations;
-    ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
-    uint32 immutable private callbackGasLimit;
-
     ///@dev The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract.
-    IRoyaltyEngineV1 immutable private royaltyEngine;
+    IRoyaltyEngineV1 immutable public royaltyEngine;
+
+    ///@dev To save gas we call Chainlink on Polygon network using Axelar.
+    IAxelarGasService public immutable gasService;
+    ///@dev Chainlink caller contract's chain.
+    string public destinationChain;
+    ///@dev Chainlink caller contract's address.
+    string public destinationAddress;
+    bytes32 private immutable destinationHash;
+
+    ///@dev ChainLink Matic/ETH price feed
+    //TODO: this won't work because ETHEREUm doesnt have Matic/ETH price feed
+    //TODO:0x327e23A4855b6F663a28c5161541d69Af8973302 on polygon
+    AggregatorV3Interface public immutable priceFeed;
 
     constructor(
         IERC20 _ESE,
         IeeseeMinter _minter,
         address _feeCollector,
         IRoyaltyEngineV1 _royaltyEngine,
-        address _vrfCoordinator, 
-        LinkTokenInterface _LINK,
-        bytes32 _keyHash,
-        uint16 _minimumRequestConfirmations,
-        uint32 _callbackGasLimit
-    ) VRFConsumerBaseV2(_vrfCoordinator) {
+        address _gateway, 
+        IAxelarGasService _gasService,
+        string memory _destinationChain, 
+        string memory _destinationAddress,
+        AggregatorV3Interface _priceFeed
+    ) AxelarExecutable(_gateway) {
         ESE = _ESE;
         minter = _minter;
         feeCollector = _feeCollector;
         royaltyEngine = _royaltyEngine;
 
-        // ChainLink stuff. Create subscription for VRF V2.
-        vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
-        subscriptionID = vrfCoordinator.createSubscription();
-        vrfCoordinator.addConsumer(subscriptionID, address(this));
-        LINK = _LINK;
-        keyHash = _keyHash;
-        minimumRequestConfirmations = _minimumRequestConfirmations;
-        callbackGasLimit = _callbackGasLimit;
+        gasService = _gasService;
+        destinationChain = _destinationChain;
+        destinationAddress = _destinationAddress;
+        destinationHash = keccak256(abi.encodePacked(destinationChain, destinationAddress));
+
+        priceFeed = _priceFeed;
 
         //Create dummy listings at index 0
         listings.push();
@@ -252,7 +250,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
-     * @dev Buys tickets to participate in a draw. Requests Chainlink to generate random words if all tickets have been bought. Emits {BuyTicket} event for each ticket bought.
+     * @dev Buys tickets to participate in a draw. Requests Axelar to send request to {destinationAddress} to generate random words if all tickets have been bought. Emits {BuyTicket} event for each ticket bought.
      * @param ID - ID of a listing to buy tickets for.
      * @param amount - Amount of tickets to buy. A single address can't buy more than {maxTicketsBoughtByAddress} of all tickets. 
      
@@ -281,9 +279,19 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         require(listing.ticketsBought <= listing.maxTickets, "eesee: All tickets bought");
 
         if(listing.ticketsBought == listing.maxTickets){
-            uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
-            chainlinkRequestIDs[requestID] = ID;
-            emit RequestWords(ID, requestID);
+            bytes memory payload = abi.encode(ID, listing.maxTickets);
+            (,int256 answer,,,) = priceFeed.latestRoundData();
+            require(answer > 0, "eesee: Unstable pricing");
+            //Note: This contract must have [40000 gas limit * 500 gwei] Matic. We multiply by {answer} to get amount in ETH.
+            gasService.payNativeGasForContractCall{value: 40000 * 500 gwei * uint256(answer) / 1 ether}(
+                address(this),
+                destinationChain,
+                destinationAddress,
+                payload,
+                address(this)
+            );
+            gateway.callContract(destinationChain, destinationAddress, payload);
+            emit RequestWords(ID);
         }
     }
 
@@ -592,20 +600,24 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     /**
-     * @dev This function is called by Chainlink. Chooses listing winner and emits {FulfillListing} event.
-     * @param requestID - Chainlink request ID.
-     * @param randomWords - Random values sent by Chainlink.
+     * @dev This function is called by Axelar. Chooses listing winner and emits {FulfillListing} event.
+     * @param sourceChain - The chain this function was called from.
+     * @param sourceAddress - The address this function was called from.
+     * @param payload - {ID, chosenTicket} abi encoded.
      */
-    function fulfillRandomWords(uint256 requestID, uint256[] memory randomWords) internal override {
-        uint256 ID = chainlinkRequestIDs[requestID];
+     function _execute(
+        string calldata sourceChain,
+        string calldata sourceAddress,
+        bytes calldata payload
+    ) internal override {
+        require(keccak256(abi.encodePacked(sourceChain, sourceAddress)) == destinationHash, "eesee: Incorrect caller");
+        
+        (uint256 ID, uint256 chosenTicket) = abi.decode(payload, (uint256, uint256));
         Listing storage listing = listings[ID];
 
         require(block.timestamp <= listing.creationTime + listing.duration, "eesee: Listing has already expired");
 
-        uint256 chosenTicket = randomWords[0] % listing.maxTickets;
         listing.winner = listing.ticketIDBuyer[chosenTicket];
-
-        delete chainlinkRequestIDs[requestID];
         emit FulfillListing(ID, listing.nft, listing.winner);
     }
 
@@ -665,16 +677,6 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         feeCollector = _feeCollector;
     }
 
-    /**
-     * @dev Fund function for Chainlink's VRF V2 subscription.
-     * @param amount - Amount of LINK to fund subscription with.
-     */
-    function fund(uint96 amount) external {
-        IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), amount);
-        LINK.transferAndCall(
-            address(vrfCoordinator),
-            amount,
-            abi.encode(subscriptionID)
-        );
-    }
+    ///@dev To call payNativeGasForContractCall this contract must have ETH in it.
+    receive() external payable {}
 }

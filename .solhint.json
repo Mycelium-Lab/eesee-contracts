@@ -1,0 +1,12 @@
+{
+    "extends": "solhint:recommended",
+    "plugins": [],
+    "rules": {
+      "var-name-mixedcase": "ignore",
+      "no-global-import":"ignore",
+      "contract-name-camelcase":"ignore",
+      "quotes":"ignore",
+      "reason-string":"ignore",
+      "not-rely-on-time":"ignore"
+    }
+  }

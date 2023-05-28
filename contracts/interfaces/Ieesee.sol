@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
+import '@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGasService.sol'; 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "./IeeseeMinter.sol";
 import "./IRoyaltyEngineV1.sol";
 
@@ -85,8 +84,7 @@ interface Ieesee {
 
 
     event RequestWords(
-        uint256 indexed ID,
-        uint256 requestID
+        uint256 indexed ID
     );
 
     event FulfillListing(
@@ -203,11 +201,11 @@ interface Ieesee {
     function fee() external view returns(uint256);
     function feeCollector() external view returns(address);
 
-    function LINK() external view returns(LinkTokenInterface);
-    function vrfCoordinator() external view returns(VRFCoordinatorV2Interface);
-    function subscriptionID() external view returns(uint64);
-    function keyHash() external view returns(bytes32);
-    function minimumRequestConfirmations() external view returns(uint16);
+    function royaltyEngine() external view returns(IRoyaltyEngineV1);
+
+    function gasService() external view returns(IAxelarGasService);
+    function destinationChain() external view returns(string memory);
+    function destinationAddress() external view returns(string memory);
 
     function listItem(
         NFT memory nft, 
@@ -294,6 +292,4 @@ interface Ieesee {
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external;
     function changeFee(uint256 _fee) external;
     function changeFeeCollector(address _feeCollector) external;
-
-    function fund(uint96 amount) external;
 }
