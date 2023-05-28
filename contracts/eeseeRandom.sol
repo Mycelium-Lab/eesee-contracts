@@ -92,7 +92,7 @@ contract eeseeRandom is VRFConsumerBaseV2, AxelarExecutable {
         (,int256 answer,,,) = priceFeed.latestRoundData();
         require(answer > 0, "eesee: Unstable pricing");
         //Note: This contract must have [40000 gas limit * 500 gwei] ETH. We divie by {answer} to get amount in Matic.
-        gasService.payNativeGasForContractCall{value: 40000 * 500 gwei * 1 ether / answer}(
+        gasService.payNativeGasForContractCall{value: 40000 * 500 gwei * 1 ether / uint256(answer)}(
             address(this),
             request.sourceChain,
             request.sourceAddress,
