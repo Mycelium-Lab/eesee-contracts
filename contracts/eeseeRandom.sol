@@ -9,17 +9,24 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import '@axelar-network/axelar-gmp-sdk-solidity/contracts/executable/AxelarExecutable.sol';
 import '@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGasService.sol'; 
 
-contract eeseeRandom is VRFConsumerBaseV2, AxelarExecutable {
-    //sourceAddress is string to save gas on string-address-string conversions
+contract eeseeRandomETH is VRFConsumerBaseV2, AxelarExecutable {
     struct RequestData {
         uint256 ID;
-        string sourceChain;
-        string sourceAddress;
         uint256 maxNumber;
     }
+    /// @dev Axelar request data from source chain.
     mapping(uint256 => RequestData) public requests;
 
-    IAxelarGasService public immutable gasService;
+    /// @dev Axelar gas service.
+    IAxelarGasService immutable public gasService;
+    ///@dev eesee contract chain.
+    string public eeseeChain;
+    ///@dev eesee contract address.
+    string public eeseeAddress;
+    bytes32 immutable private eeseeHash;
+
+    ///@dev ChainLink Matic/ETH price feed
+    AggregatorV3Interface immutable public priceFeed_MATIC_ETH;
 
     ///@dev Chainlink token.
     LinkTokenInterface immutable public LINK;
@@ -34,21 +41,24 @@ contract eeseeRandom is VRFConsumerBaseV2, AxelarExecutable {
     ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
     uint32 immutable private callbackGasLimit;
 
-    ///@dev ChainLink Matic/ETH price feed
-    //TODO:0x327e23A4855b6F663a28c5161541d69Af8973302 on polygon
-    AggregatorV3Interface public immutable priceFeed;
-
     constructor(
         address _gateway, 
         IAxelarGasService _gasService,
+        string memory _eeseeChain, 
+        string memory _eeseeAddress,
+        AggregatorV3Interface _priceFeed_MATIC_ETH,
         address _vrfCoordinator, 
         LinkTokenInterface _LINK,
         bytes32 _keyHash,
         uint16 _minimumRequestConfirmations,
-        uint32 _callbackGasLimit,
-        AggregatorV3Interface _priceFeed
+        uint32 _callbackGasLimit
     ) VRFConsumerBaseV2(_vrfCoordinator) AxelarExecutable(_gateway) {
         gasService = _gasService;
+        eeseeChain = _eeseeChain;
+        eeseeAddress = _eeseeAddress;
+        eeseeHash = keccak256(abi.encodePacked(eeseeChain, eeseeAddress));
+
+        priceFeed_MATIC_ETH = _priceFeed_MATIC_ETH;
 
         // ChainLink stuff. Create subscription for VRF V2.
         vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
@@ -58,29 +68,25 @@ contract eeseeRandom is VRFConsumerBaseV2, AxelarExecutable {
         keyHash = _keyHash;
         minimumRequestConfirmations = _minimumRequestConfirmations;
         callbackGasLimit = _callbackGasLimit;
-
-        priceFeed = _priceFeed;
     }
 
     // ============ Internal Methods ============
 
-    //TODO: make sure this can only be called by eesee SC
+    //TODO: get execute gasLimit for better approximation
     function _execute(
         string calldata sourceChain,
         string calldata sourceAddress,
         bytes calldata payload
     ) internal override {
+        require(keccak256(abi.encodePacked(sourceChain, sourceAddress)) == eeseeHash, "eesee: Incorrect caller");
         (uint256 ID, uint256 maxNumber) = abi.decode(payload, (uint256, uint256));
         uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
 
         requests[requestID] = RequestData({
             ID: ID,
-            sourceChain: sourceChain,
-            sourceAddress: sourceAddress,
             maxNumber: maxNumber
         });
     }
-
 
     function fulfillRandomWords(uint256 requestID, uint256[] memory randomWords) internal override {
         RequestData memory request = requests[requestID];
@@ -89,18 +95,22 @@ contract eeseeRandom is VRFConsumerBaseV2, AxelarExecutable {
         uint256 chosenTicket = randomWords[0] % request.maxNumber;
 
         bytes memory payload = abi.encode(request.ID, chosenTicket);
-        (,int256 answer,,,) = priceFeed.latestRoundData();
+        (,int256 answer,,,) = priceFeed_MATIC_ETH.latestRoundData();
         require(answer > 0, "eesee: Unstable pricing");
-        //Note: This contract must have [40000 gas limit * 500 gwei] ETH. We divie by {answer} to get amount in Matic.
-        gasService.payNativeGasForContractCall{value: 40000 * 500 gwei * 1 ether / uint256(answer)}(
+
+        uint256 numerator = 10^priceFeed_MATIC_ETH.decimals();
+        //Note: This contract must have [40000 gas limit * 500 gwei] ETH. We divide by {answer} to get amount in Matic.
+        gasService.payNativeGasForContractCall{value: 40000 * 500 gwei * numerator / uint256(answer)}(
             address(this),
-            request.sourceChain,
-            request.sourceAddress,
+            eeseeChain,
+            eeseeAddress,
             payload,
             msg.sender
         );
-        gateway.callContract(request.sourceChain, request.sourceAddress, payload);
+        gateway.callContract(eeseeChain, eeseeAddress, payload);
     }
+
+    // ============ Admin Methods ============
 
     /**
      * @dev Fund function for Chainlink's VRF V2 subscription.
@@ -115,6 +125,6 @@ contract eeseeRandom is VRFConsumerBaseV2, AxelarExecutable {
         );
     }
 
-    ///@dev To call payNativeGasForContractCall this contract must have ETH in it.
+    ///@dev To call payNativeGasForContractCall this contract must have Matic in it.
     receive() external payable {}
 }

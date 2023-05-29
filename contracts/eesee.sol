@@ -22,7 +22,6 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
 
     ///@dev Min and max durations for a listing.
     uint256 public minDuration = 1 days;
-    //TODO: this is too long
     uint256 public maxDuration = 30 days;
     ///@dev Max tickets bought by a single address in a single listing. [1 ether == 100%]
     //Note: Users can still buy 1 ticket even if this check fails. e.g. there is a listing with only 2 tickets and this is set to 20%.
@@ -43,10 +42,9 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
     string public destinationAddress;
     bytes32 private immutable destinationHash;
 
-    ///@dev ChainLink Matic/ETH price feed
-    //TODO: this won't work because ETHEREUm doesnt have Matic/ETH price feed
-    //TODO:0x327e23A4855b6F663a28c5161541d69Af8973302 on polygon
-    AggregatorV3Interface public immutable priceFeed;
+    ///@dev ChainLink price feeds for MATIC/ETH calculation.
+    AggregatorV3Interface public immutable priceFeed_MATIC_USD;
+    AggregatorV3Interface public immutable priceFeed_ETH_USD;
 
     constructor(
         IERC20 _ESE,
@@ -57,7 +55,8 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
         IAxelarGasService _gasService,
         string memory _destinationChain, 
         string memory _destinationAddress,
-        AggregatorV3Interface _priceFeed
+        AggregatorV3Interface _priceFeed_MATIC_USD,
+        AggregatorV3Interface _priceFeed_ETH_USD
     ) AxelarExecutable(_gateway) {
         ESE = _ESE;
         minter = _minter;
@@ -69,7 +68,8 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
         destinationAddress = _destinationAddress;
         destinationHash = keccak256(abi.encodePacked(destinationChain, destinationAddress));
 
-        priceFeed = _priceFeed;
+        priceFeed_MATIC_USD = _priceFeed_MATIC_USD;
+        priceFeed_ETH_USD = _priceFeed_ETH_USD;
 
         //Create dummy listings at index 0
         listings.push();
@@ -279,11 +279,18 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
         require(listing.ticketsBought <= listing.maxTickets, "eesee: All tickets bought");
 
         if(listing.ticketsBought == listing.maxTickets){
+            (,int256 MATIC_USD,,,) = priceFeed_MATIC_USD.latestRoundData();
+            (,int256 ETH_USD,,,) = priceFeed_ETH_USD.latestRoundData();
+            require((MATIC_USD > 0) && (ETH_USD > 0), "eesee: Unstable pricing");
+
             bytes memory payload = abi.encode(ID, listing.maxTickets);
-            (,int256 answer,,,) = priceFeed.latestRoundData();
-            require(answer > 0, "eesee: Unstable pricing");
-            //Note: This contract must have [40000 gas limit * 500 gwei] Matic. We multiply by {answer} to get amount in ETH.
-            gasService.payNativeGasForContractCall{value: 40000 * 500 gwei * uint256(answer) / 1 ether}(
+            uint256 denominator_MATIC_USD = 10^priceFeed_MATIC_USD.decimals();
+            uint256 denominator_ETH_USD = 10^priceFeed_ETH_USD.decimals();
+            // uint256 MATIC_ETH = (MATIC_USD / denominator_MATIC_USD) / (ETH_USD / denominator_ETH_USD);
+            //Note: This contract must have [40000 gas limit * 500 gwei] Matic. We multiply by {MATIC_ETH} to get amount in ETH.
+            gasService.payNativeGasForContractCall{
+                value: 40000 * 500 gwei * uint256(MATIC_USD) * denominator_ETH_USD / denominator_MATIC_USD / uint256(ETH_USD)
+            }(
                 address(this),
                 destinationChain,
                 destinationAddress,
@@ -605,6 +612,7 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
      * @param sourceAddress - The address this function was called from.
      * @param payload - {ID, chosenTicket} abi encoded.
      */
+    //TODO: get execute gasLimit for better approximation
      function _execute(
         string calldata sourceChain,
         string calldata sourceAddress,
@@ -614,7 +622,6 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
         
         (uint256 ID, uint256 chosenTicket) = abi.decode(payload, (uint256, uint256));
         Listing storage listing = listings[ID];
-
         require(block.timestamp <= listing.creationTime + listing.duration, "eesee: Listing has already expired");
 
         listing.winner = listing.ticketIDBuyer[chosenTicket];
