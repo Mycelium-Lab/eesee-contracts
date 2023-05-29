@@ -46,6 +46,8 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
     AggregatorV3Interface public immutable priceFeed_MATIC_USD;
     AggregatorV3Interface public immutable priceFeed_ETH_USD;
 
+    //TODO: add custom errors to save gas
+
     constructor(
         IERC20 _ESE,
         IeeseeMinter _minter,
@@ -286,11 +288,11 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
             bytes memory payload = abi.encode(ID, listing.maxTickets);
             uint256 denominator_MATIC_USD = 10^priceFeed_MATIC_USD.decimals();
             uint256 denominator_ETH_USD = 10^priceFeed_ETH_USD.decimals();
+            uint256 networkBaseFee = 40000000000000;//TODO:calc
             // uint256 MATIC_ETH = (MATIC_USD / denominator_MATIC_USD) / (ETH_USD / denominator_ETH_USD);
-            //Note: This contract must have [40000 gas limit * 500 gwei] Matic. We multiply by {MATIC_ETH} to get amount in ETH.
-            gasService.payNativeGasForContractCall{
-                value: 40000 * 500 gwei * uint256(MATIC_USD) * denominator_ETH_USD / denominator_MATIC_USD / uint256(ETH_USD)
-            }(
+            //Note: This contract must have [130000 gas limit * 500 gwei] Matic. We multiply by {MATIC_ETH} to get amount in ETH.
+            uint256 executionFee = 130000 * 500 gwei * uint256(MATIC_USD) * denominator_ETH_USD / denominator_MATIC_USD / uint256(ETH_USD);
+            gasService.payNativeGasForContractCall{value: networkBaseFee + executionFee}(
                 address(this),
                 destinationChain,
                 destinationAddress,

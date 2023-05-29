@@ -16,6 +16,7 @@
   "dependencies": {
     "@axelar-network/axelar-gmp-sdk-solidity": "3.3.0",
     "@chainlink/contracts": "0.6.1",
+    "@ethersproject/address": "^5.7.0",
     "@nomicfoundation/hardhat-toolbox": "2.0.2",
     "@openzeppelin/contracts": "4.8.2",
     "@openzeppelin/merkle-tree": "1.0.4",
