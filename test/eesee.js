@@ -49,7 +49,8 @@ const {
             zeroAddress,//ChainLink token
             '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
             0,//minimumRequestConfirmations
-            50000//callbackGasLimit
+            50000,//callbackGasLimit
+            '0x0000000000000000000000000000000000000000'//1inch router, does not matter in this test
         )
         await eesee.deployed()
         NFT = await _NFT.deploy("TEST", "TST", '', '')
@@ -70,10 +71,10 @@ const {
     })
 
     it('Lists NFT', async () => {
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 1, 2, 86400)).to.be.revertedWith("eesee: Max tickets must be more or equal 2")
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86400)).to.be.revertedWith('eesee: Ticket price must be above zero')
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86399)).to.be.revertedWith('eesee: Duration must be more or equal minDuration')
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 2592001)).to.be.revertedWith('eesee: Duration must be less or equal maxDuration')
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 1, 2, 86400)).to.be.revertedWithCustomError(eesee, "MaxTicketsTooLow")
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86400)).to.be.revertedWithCustomError(eesee, "TicketPriceTooLow")
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86399)).to.be.revertedWithCustomError(eesee, "DurationTooLow").withArgs(86400)
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 2592001)).to.be.revertedWithCustomError(eesee, "DurationTooHigh").withArgs(2592000)
         
         const ID = 1
         await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 2, 86400))
@@ -189,9 +190,9 @@ const {
 
     it('Buys tickets', async () => {
         const ID = 1
-        await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWith("eesee: Amount must be above zero")
-        await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWith('eesee: Listing does not exist')
-        await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWith('eesee: Max tickets bought by this address')
+        await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWithCustomError(eesee, "BuyAmountTooLow")
+        await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWithCustomError(eesee, "ListingNotExists").withArgs(0);
+        await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address);
 
         const balanceBefore = await ESE.balanceOf(acc2.address)
         const recipt = expect(eesee.connect(acc2).buyTickets(ID, 20))
@@ -208,7 +209,7 @@ const {
         const balanceAfter = await ESE.balanceOf(acc2.address)
         assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
 
-        await expect(eesee.connect(acc2).buyTickets(ID, 1)).to.be.revertedWith("eesee: Max tickets bought by this address")
+        await expect(eesee.connect(acc2).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address)
 
         const listing = await eesee.listings(ID);
         assert.equal(listing.ticketsBought, 20, "ticketsBought is correct")
@@ -232,20 +233,20 @@ const {
             const balanceAfter = await ESE.balanceOf(ticketBuyers[i].address)
             assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
 
-            await expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 1)).to.be.revertedWith("eesee: Max tickets bought by this address")
+            await expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(ticketBuyers[i].address)
 
             const listing = await eesee.listings(ID);
             assert.equal(listing.ticketsBought, (i + 1)*20, "ticketsBought is correct")
 
             await expect(eesee.connect(ticketBuyers[i]).batchReceiveItems([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Caller is not the winner")
+                .to.be.revertedWithCustomError(eesee, "CallerNotWinner").withArgs(ID)
             await expect(eesee.connect(ticketBuyers[i]).batchReceiveTokens([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Listing is not filfilled")
+                .to.be.revertedWithCustomError(eesee, "ListingNotFulfilled").withArgs(ID)
 
             await expect(eesee.connect(signer).batchReclaimItems([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Listing has not expired yet")
+                .to.be.revertedWithCustomError(eesee, "ListingNotExpired").withArgs(ID)
             await expect(eesee.connect(ticketBuyers[i]).batchReclaimTokens([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Listing has not expired yet")
+                .to.be.revertedWithCustomError(eesee, "ListingNotExpired").withArgs(ID)
 
             if(i == 4){
                 //MockVRF's first requestID is 0
@@ -260,7 +261,7 @@ const {
             await buyTicketsForExpiredReceipt.to.emit(eesee, "BuyTicket").withArgs(expiredListingID, acc7.address, i, 3)
         }
         
-        await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1)).to.be.revertedWith("eesee: All tickets bought")
+        await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "AllTicketsBought")
     })
 
     it('Selects winner', async () => {
@@ -281,7 +282,7 @@ const {
         const winnerAcc = signers.filter(signer => signer.address === listing.winner)[0]
         const notWinnerAcc = signers.filter(signer => signer.address !== listing.winner)[0]
         await expect(eesee.connect(notWinnerAcc).batchReceiveItems([ID], listing.winner))
-        .to.be.revertedWith("eesee: Caller is not the winner")
+        .to.be.revertedWithCustomError(eesee, "CallerNotWinner").withArgs(ID)
         await expect(eesee.connect(winnerAcc).batchReceiveItems([ID], listing.winner))
         .to.emit(eesee, "ReceiveItem")
         .withArgs(ID, anyValue, listing.winner)
@@ -291,12 +292,12 @@ const {
         const owner = await NFT.ownerOf(ID)
         assert.equal(owner, listing.winner, "new owner of NFT is correct")
         await expect(eesee.connect(winnerAcc).batchReceiveItems([ID], listing.winner))
-        .to.be.revertedWith("eesee: Item has already been claimed")
+        .to.be.revertedWithCustomError(eesee, "ItemAlreadyClaimed").withArgs(ID)
     })
     it('Receives tokens',  async () => {
         const ID = 1
         await expect(eesee.connect(acc2).batchReceiveTokens([ID], acc2.address))
-        .to.be.revertedWith("eesee: Caller is not the owner")
+        .to.be.revertedWithCustomError(eesee, "CallerNotOwner").withArgs(ID)
 
         const listing = await eesee.listings(ID);
         const expectedFee = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) * BigInt(listing.fee) / BigInt('1000000000000000000')
@@ -317,7 +318,7 @@ const {
 
         // reverted with eesee: Listing is not filfilled because listing deleted after previous claim
         await expect(eesee.connect(signer).batchReceiveTokens([ID], signer.address))
-        .to.be.revertedWith("eesee: Listing is not filfilled")
+        .to.be.revertedWithCustomError(eesee, "ListingNotFulfilled").withArgs(ID)
     })
     it('buyTickets reverts if listing is expired', async () => {
         const IDs = [2,3,4]
@@ -330,8 +331,8 @@ const {
         const listing = await eesee.listings(IDs[0])
         assert.equal(timestampBeforeTimeSkip, timestampAfterTimeSkip-86401, "timetravel is successfull")
         assert.equal((listing.creationTime.add(listing.duration)).lt(timestampAfterTimeSkip), true, "listing expired")
-        await expect(eesee.connect(acc2).buyTickets(IDs[0], 20)).to.be.revertedWith("eesee: Listing has already expired")
-        await expect(eesee.connect(acc2).buyTickets(IDs[1], 20)).to.be.revertedWith("eesee: Listing has already expired")
+        await expect(eesee.connect(acc2).buyTickets(IDs[0], 20)).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[0])
+        await expect(eesee.connect(acc2).buyTickets(IDs[1], 20)).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[1])
     })
     it('Can reclaim tokens if listing is expired', async () => {
         const expiredListingID = 2
@@ -343,7 +344,7 @@ const {
     it('Can reclaim item if listing is expired', async () => {
         const IDs = [2,3,4]
         await expect(eesee.connect(acc2).batchReclaimItems(IDs, signer.address))
-        .to.be.revertedWith("eesee: Caller is not the owner")
+        .to.be.revertedWithCustomError(eesee, "CallerNotOwner").withArgs(2)
         await expect(eesee.connect(signer).batchReclaimItems(IDs, signer.address))
         .to.emit(eesee, "ReclaimItem")
         .withArgs(2, anyValue, signer.address)
@@ -353,7 +354,7 @@ const {
         .withArgs(4, anyValue, signer.address)
 
         await expect(eesee.connect(signer).batchReclaimItems([4], signer.address))
-            .to.be.revertedWith("eesee: Item has already been claimed")
+            .to.be.revertedWithCustomError(eesee, "ItemAlreadyClaimed").withArgs(4)
     })
     it('Royalties work for public collections', async () => {
         const currentListingID = (await eesee.getListingsLength()).toNumber()
@@ -509,7 +510,7 @@ const {
 
         const maxTicketsBoughtByAddress = await eesee.maxTicketsBoughtByAddress() 
         await expect(eesee.connect(acc2).changeMaxTicketsBoughtByAddress(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
-        await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress('1000000000000000001')).to.be.revertedWith("eesee: Can't set maxTicketsBoughtByAddress to more than 100%")
+        await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress('1000000000000000001')).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddressTooHigh")
         await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress(newValue))
         .to.emit(eesee, "ChangeMaxTicketsBoughtByAddress")
         .withArgs(maxTicketsBoughtByAddress, newValue)
@@ -517,7 +518,7 @@ const {
 
         const fee = await eesee.fee() 
         await expect(eesee.connect(acc2).changeFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
-        await expect(eesee.connect(signer).changeFee('400000000000000001')).to.be.revertedWith("eesee: Can't set fees to more than 40%")
+        await expect(eesee.connect(signer).changeFee('500000000000000001')).to.be.revertedWithCustomError(eesee, "FeeTooHigh")
         await expect(eesee.connect(signer).changeFee(newValue))
         .to.emit(eesee, "ChangeFee")
         .withArgs(fee, newValue)
