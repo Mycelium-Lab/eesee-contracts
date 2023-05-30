@@ -114,9 +114,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256[] memory ticketPrices, 
         uint256[] memory durations
     ) external returns(uint256[] memory IDs){
-        if(nfts.length != maxTickets.length || maxTickets.length != ticketPrices.length || ticketPrices.length != durations.length){
+        if(nfts.length != maxTickets.length || maxTickets.length != ticketPrices.length || ticketPrices.length != durations.length)
             revert InvalidArrayLengths();
-        }
         IDs = new uint256[](nfts.length);
         for(uint256 i = 0; i < nfts.length; i++) {
             nfts[i].collection.safeTransferFrom(msg.sender, address(this), nfts[i].tokenID);
@@ -177,9 +176,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs){
-        if(maxTickets.length != ticketPrices.length || maxTickets.length != durations.length){
-            revert InvalidArrayLengths();
-        }
+        if(maxTickets.length != ticketPrices.length || maxTickets.length != durations.length) revert InvalidArrayLengths();
         (collection, tokenIDs) = minter.mintToPublicCollection(maxTickets.length, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
 
         IDs = new uint256[](maxTickets.length);
@@ -248,9 +245,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs){
-        if(maxTickets.length != ticketPrices.length || maxTickets.length != durations.length){
-            revert InvalidArrayLengths();
-        }
+        if(maxTickets.length != ticketPrices.length || maxTickets.length != durations.length) revert InvalidArrayLengths();
         (collection, tokenIDs) = minter.mintToPrivateCollection(maxTickets.length, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
         
         IDs = new uint256[](maxTickets.length);
@@ -280,33 +275,25 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return ticketsBought - Tickets bought.
      */
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external payable returns(uint256 tokensSpent, uint256 ticketsBought){
-        (,SwapDescription memory desc,,) = abi.decode(swapData[4:], (address, SwapDescription, bytes, bytes));
+        (,IAggregationRouterV5.SwapDescription memory desc,,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes, bytes));
         if(
-            bytes4(swapData[:4]) != bytes4(0x12aa3caf) || 
+            bytes4(swapData[:4]) != IAggregationRouterV5.swap.selector || 
             desc.srcToken == ESE || 
             desc.dstToken != ESE || 
             (desc.dstReceiver != address(this) && desc.dstReceiver != address(0))
-        ){
-            revert InvalidSwapDescription();
-        }
+        ) revert InvalidSwapDescription();
 
         bool isETH = (address(desc.srcToken) == address(0) || address(desc.srcToken) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         if(isETH){
-            if(msg.value != desc.amount){
-                revert InvalidMsgValue();
-            }
+            if(msg.value != desc.amount) revert InvalidMsgValue();
         }else{
-            if(msg.value != 0){
-                revert InvalidMsgValue();
-            }
+            if(msg.value != 0) revert InvalidMsgValue();
             desc.srcToken.transferFrom(msg.sender, address(this), desc.amount);
             desc.srcToken.approve(OneInchRouter, desc.amount);
         }
 
         (bool success, bytes memory data) = OneInchRouter.call{value: msg.value}(swapData);
-        if(!success){
-            revert SwapNotSuccessful();
-        }
+        if(!success) revert SwapNotSuccessful();
         uint256 returnAmount;
         (returnAmount, tokensSpent) = abi.decode(data, (uint256, uint256));
 
@@ -322,9 +309,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         if(desc.amount > tokensSpent){
             if(isETH){
                 (success, ) = msg.sender.call{value: desc.amount - tokensSpent, gas: 5000}("");
-                if(!success){
-                    revert TransferNotSuccessful();
-                }
+                if(!success) revert TransferNotSuccessful();
             }else{
                 desc.srcToken.transfer(address(msg.sender), desc.amount - tokensSpent);
             }   
@@ -361,9 +346,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         IeeseeNFTDrop.StageOptions memory publicStageOptions,
         IeeseeNFTDrop.StageOptions[] memory presalesOptions
     ) external returns (uint256 ID, IERC721 collection){
-        if(earningsCollector == address(0)){
-            revert InvalidEarningsCollector();
-        }
+        if(earningsCollector == address(0)) revert InvalidEarningsCollector();
         collection = minter.deployDropCollection(
             name,
             symbol,
@@ -396,9 +379,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return mintPrice - Amount of ESE tokens spent on minting.
      */
     function mintDrop(uint256 ID, uint256 quantity, bytes32[] memory merkleProof) external returns(uint256 mintPrice){
-        if(quantity == 0){
-            revert InvalidQuantity();
-        }
+        if(quantity == 0) revert InvalidQuantity();
         Drop storage drop = drops[ID];
 
         IeeseeNFTDrop _drop = IeeseeNFTDrop(address(drop.collection));
@@ -429,9 +410,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: Returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
     function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
-        if(recipient == address(0)){
-            revert InvalidRecipient();
-        }
+        if(recipient == address(0)) revert InvalidRecipient();
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
@@ -439,12 +418,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
 
-            if(msg.sender != listing.winner){
-                revert CallerNotWinner(ID);
-            }
-            if(listing.itemClaimed){
-                revert ItemAlreadyClaimed(ID);
-            }
+            if(msg.sender != listing.winner) revert CallerNotWinner(ID);
+            if(listing.itemClaimed) revert ItemAlreadyClaimed(ID);
 
             collections[i] = listing.nft.collection;
             tokenIDs[i] = listing.nft.tokenID;
@@ -453,9 +428,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
             emit ReceiveItem(ID, listing.nft, recipient);
 
-            if(listing.tokensClaimed){
-                delete listings[ID];
-            }
+            if(listing.tokensClaimed) delete listings[ID];
         }
     }
 
@@ -467,22 +440,14 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return amount - ESE received.
      */
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
-        if(recipient == address(0)){
-            revert InvalidRecipient();
-        }
+        if(recipient == address(0)) revert InvalidRecipient();
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
 
-            if(listing.winner == address(0)){
-                revert ListingNotFulfilled(ID);
-            }
-            if(msg.sender != listing.owner){
-                revert CallerNotOwner(ID);
-            }
-            if(listing.tokensClaimed){
-                revert TokensAlreadyClaimed(ID);
-            }
+            if(listing.winner == address(0)) revert ListingNotFulfilled(ID);
+            if(msg.sender != listing.owner) revert CallerNotOwner(ID);
+            if(listing.tokensClaimed) revert TokensAlreadyClaimed(ID);
 
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
@@ -492,9 +457,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
             emit ReceiveTokens(ID, recipient, _amount);
 
-            if(listing.itemClaimed){
-                delete listings[ID];
-            }
+            if(listing.itemClaimed) delete listings[ID];
         }
         // Transfer later to save gas
         ESE.safeTransfer(recipient, amount);
@@ -510,9 +473,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
     function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
-        if(recipient == address(0)){
-            revert InvalidRecipient();
-        }
+        if(recipient == address(0)) revert InvalidRecipient();
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
@@ -520,18 +481,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
 
-            if(msg.sender != listing.owner){
-                revert CallerNotOwner(ID);
-            }
-            if(block.timestamp <= listing.creationTime + listing.duration){
-                revert ListingNotExpired(ID);
-            }
-            if(listing.itemClaimed){
-                revert ItemAlreadyClaimed(ID);
-            }
-            if(listing.winner != address(0)){
-                revert ListingAlreadyFulfilled(ID);
-            }
+            if(msg.sender != listing.owner) revert CallerNotOwner(ID);
+            if(block.timestamp <= listing.creationTime + listing.duration) revert ListingNotExpired(ID);
+            if(listing.itemClaimed) revert ItemAlreadyClaimed(ID);
+            if(listing.winner != address(0)) revert ListingAlreadyFulfilled(ID);
 
             collections[i] = listing.nft.collection;
             tokenIDs[i] = listing.nft.tokenID;
@@ -540,9 +493,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
             emit ReclaimItem(ID, listing.nft, recipient);
 
-            if(listing.ticketsBought == 0){
-                delete listings[ID];
-            }
+            if(listing.ticketsBought == 0) delete listings[ID];
         }
     }
 
@@ -562,15 +513,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             Listing storage listing = listings[ID];
             uint256 ticketsBoughtByAddress = listing.ticketsBoughtByAddress[msg.sender];
 
-            if(ticketsBoughtByAddress == 0){
-                revert NoTicketsBought(ID);
-            }
-            if(block.timestamp <= listing.creationTime + listing.duration){
-                revert ListingNotExpired(ID);
-            }
-            if(listing.winner != address(0)){
-                revert ListingAlreadyFulfilled(ID);
-            }
+            if(ticketsBoughtByAddress == 0) revert NoTicketsBought(ID);
+            if(block.timestamp <= listing.creationTime + listing.duration) revert ListingNotExpired(ID);
+            if(listing.winner != address(0)) revert ListingAlreadyFulfilled(ID);
 
             listing.ticketsBought -= ticketsBoughtByAddress;
             listing.ticketsBoughtByAddress[msg.sender] = 0;
@@ -580,9 +525,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
             emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
 
-            if(listing.ticketsBought == 0 && listing.itemClaimed){
-                delete listings[ID];
-            }
+            if(listing.ticketsBought == 0 && listing.itemClaimed) delete listings[ID];
         }
         // Transfer later to save some gas
         ESE.safeTransfer(recipient, amount);
@@ -632,18 +575,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     // Note: Must be called after nft was minted/transfered
     function _listItem(NFT memory nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) internal returns(uint256 ID){
-        if(duration < minDuration){
-            revert DurationTooLow(minDuration);
-        }
-        if(duration > maxDuration){
-            revert DurationTooHigh(maxDuration);
-        }
-        if(maxTickets < 2){
-            revert MaxTicketsTooLow();
-        }
-        if(ticketPrice == 0){
-            revert TicketPriceTooLow();
-        }
+        if(duration < minDuration) revert DurationTooLow(minDuration);
+        if(duration > maxDuration) revert DurationTooHigh(maxDuration);
+        if(maxTickets < 2) revert MaxTicketsTooLow();
+        if(ticketPrice == 0) revert TicketPriceTooLow();
 
         ID = listings.length;
 
@@ -661,16 +596,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     function _buyTickets(uint256 ID, uint256 amount) internal returns(uint256 tokensSpent){
-        if(amount == 0){
-            revert BuyAmountTooLow();
-        }
+        if(amount == 0) revert BuyAmountTooLow();
         Listing storage listing = listings[ID];
-        if(listing.owner == address(0)){
-            revert ListingNotExists(ID);
-        }
-        if(block.timestamp > listing.creationTime + listing.duration){
-            revert ListingExpired(ID);
-        }
+        if(listing.owner == address(0)) revert ListingNotExists(ID);
+        if(block.timestamp > listing.creationTime + listing.duration) revert ListingExpired(ID);
 
         tokensSpent = listing.ticketPrice * amount;
 
@@ -683,13 +612,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
         //Allow buy single tickets even if bought amount is more than maxTicketsBoughtByAddress
         if(listing.ticketsBoughtByAddress[msg.sender] > 1){
-            if(listing.ticketsBoughtByAddress[msg.sender] * 1 ether / listing.maxTickets > maxTicketsBoughtByAddress){
-                revert MaxTicketsBoughtByAddress(msg.sender);
-            }
+            if(listing.ticketsBoughtByAddress[msg.sender] * 1 ether / listing.maxTickets > maxTicketsBoughtByAddress) revert MaxTicketsBoughtByAddress(msg.sender);
         }
-        if(listing.ticketsBought > listing.maxTickets){
-            revert AllTicketsBought();
-        }
+        if(listing.ticketsBought > listing.maxTickets) revert AllTicketsBought();
 
         if(listing.ticketsBought == listing.maxTickets){
             uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
@@ -711,9 +636,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     }
 
     function _collectFee(uint256 amount, uint256 _fee) internal returns(uint256 feeAmount){
-        if(feeCollector == address(0)){
-            return 0;
-        }
+        if(feeCollector == address(0)) return 0;
         feeAmount = amount * _fee / 1 ether;
         if(feeAmount > 0){
             ESE.safeTransfer(feeCollector, feeAmount);
@@ -730,9 +653,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256 ID = chainlinkRequestIDs[requestID];
         Listing storage listing = listings[ID];
 
-        if(block.timestamp > listing.creationTime + listing.duration){
-            revert ListingExpired(ID);
-        }
+        if(block.timestamp > listing.creationTime + listing.duration) revert ListingExpired(ID);
 
         uint256 chosenTicket = randomWords[0] % listing.maxTickets;
         listing.winner = listing.ticketIDBuyer[chosenTicket];
@@ -769,9 +690,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: This function can only be called by owner.
      */
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external onlyOwner {
-        if(_maxTicketsBoughtByAddress > 1 ether){
-            revert MaxTicketsBoughtByAddressTooHigh();
-        }
+        if(_maxTicketsBoughtByAddress > 1 ether) revert MaxTicketsBoughtByAddressTooHigh();
 
         emit ChangeMaxTicketsBoughtByAddress(maxTicketsBoughtByAddress, _maxTicketsBoughtByAddress);
         maxTicketsBoughtByAddress = _maxTicketsBoughtByAddress;
@@ -783,9 +702,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: This function can only be called by owner.
      */
     function changeFee(uint256 _fee) external onlyOwner {
-        if(_fee > 0.5 ether){
-            revert FeeTooHigh();
-        }
+        if(_fee > 0.5 ether) revert FeeTooHigh();
 
         emit ChangeFee(fee, _fee);
         fee = _fee;

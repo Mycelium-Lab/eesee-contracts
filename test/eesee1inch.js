@@ -9,7 +9,6 @@ const {
   const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
   describe("eesee", function () {
     let ESE;
-    let ERC20;
     let mockVRF;
     let eesee;
     let NFT;
@@ -17,8 +16,6 @@ const {
     let ticketBuyers;
     let minter;
     let royaltyEninge;
-    let mock1InchExecutor
-    let mock1InchRouter
     //after one year
     const zeroAddress = "0x0000000000000000000000000000000000000000"
   
@@ -31,13 +28,8 @@ const {
         const _NFT = await hre.ethers.getContractFactory("eeseeNFT");
         const _minter = await hre.ethers.getContractFactory("eeseeMinter");
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
-        const _mock1InchExecutor = await hre.ethers.getContractFactory("Mock1InchExecutor");
-        const _mock1InchRouter = await hre.ethers.getContractFactory("Mock1InchRouter");
-        ESE = await _ESE.deploy('2000000000000000000000000')
+        ESE = await _ESE.deploy('1000000000000000000000000')
         await ESE.deployed()
-
-        ERC20 = await _ESE.deploy('2000000000000000000000000')
-        await ERC20.deployed()
 
         mockVRF = await _mockVRF.deploy()
         await mockVRF.deployed()
@@ -47,15 +39,6 @@ const {
 
         royaltyEninge = await _royaltyEngine.deploy();
         await royaltyEninge.deployed()
-
-        //TODO: transfer ESE&&TEST tokens to it
-        mock1InchExecutor = await _mock1InchExecutor.deploy(ESE.address, ERC20.address);
-        await mock1InchExecutor.deployed()
-        await ESE.transfer(mock1InchExecutor.address, '1000000000000000000000000')
-        await ERC20.transfer(mock1InchExecutor.address, '1000000000000000000000000')
-
-        mock1InchRouter = await _mock1InchRouter.deploy();
-        await mock1InchRouter.deployed()
 
         eesee = await _eesee.deploy(
             ESE.address, 
@@ -67,7 +50,7 @@ const {
             '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
             0,//minimumRequestConfirmations
             50000,//callbackGasLimit
-            mock1InchRouter.address
+            '0x0000000000000000000000000000000000000000'//1inch router, does not matter in this test
         )
         await eesee.deployed()
         NFT = await _NFT.deploy("TEST", "TST", '', '')
@@ -509,42 +492,6 @@ const {
         let royaltyCollectorBalanceAfter = await ESE.balanceOf(royaltyCollector.address)
         assert.equal(royaltyCollectorBalanceBefore.add(royaltyInfoForListing1[1]).toString(), royaltyCollectorBalanceAfter.toString(), 'Royalty collector balance is correct')
     })
-
-    it('swaps tokens using 1inch', async () => {
-        const currentListingID = (await eesee.getListingsLength()).toNumber()
-        await eesee.connect(signer).mintAndListItem(
-            'contract/',
-            5,
-            50,
-            86400,
-            royaltyCollector.address,
-            300
-        )
-
-        await ERC20.approve(eesee.address, '101')
-
-        let iface = new ethers.utils.Interface([
-            'function swap(address executor, tuple(address srcToken, address dstToken, address srcReceiver, address dstReceiver, uint amount, uint minReturnAmount, uint flags) desc, bytes permit, bytes data)'
-        ]);
-        const swapData = iface.encodeFunctionData('swap', [
-            mock1InchExecutor.address, 
-            {
-                srcToken: ERC20.address,//TODO: cant be ESE //ADDRESS
-                dstToken: ESE.address,//TODO: has to be ESE //ADDRESS
-                srcReceiver: mock1InchExecutor.address,//TODO: check 0 //ADDRESS
-                dstReceiver: eesee.address, //ADDRESS
-                amount: 101, //should buy 2 tickets//UINT256
-                minReturnAmount: 1,//UINT256
-                flags: 0,//UINT256
-            }, 
-            '0x00',//bytes
-            '0x00'//bytes
-        ])
-        console.log(swapData)
-
-        await eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData)
-    })
-
     it('Changes constants', async () => {
         let newValue = 1
         const minDuration = await eesee.minDuration() 

@@ -54,12 +54,9 @@ contract eeseePool is Ownable{
     function claimRewards(Claim[] memory claims) external{
         for (uint256 i = 0; i < claims.length; i++) {
             Claim memory claim = claims[i];
-            if(!verifyClaim(msg.sender, claim)){
-                revert InvalidMerkleProof();
-            }
-            if(isClaimed[msg.sender][claim.rewardID]){
-                revert AlreadyClaimed();
-            }
+            if(!verifyClaim(msg.sender, claim)) revert InvalidMerkleProof();
+            if(isClaimed[msg.sender][claim.rewardID]) revert AlreadyClaimed();
+            
             isClaimed[msg.sender][claim.rewardID] = true;
 
             rewardToken.safeTransfer(msg.sender, claim.balance);

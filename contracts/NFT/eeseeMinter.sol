@@ -26,9 +26,7 @@ contract eeseeMinter {
      * @return tokenIDs - IDs of tokens minted.
      */
     function mintToPublicCollection(uint256 amount, string[] memory tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns(address collection, uint256[] memory tokenIDs){
-        if(tokenURIs.length != amount){
-            revert IncorrectTokenURILength();
-        }
+        if(tokenURIs.length != amount) revert IncorrectTokenURILength();
 
         uint256 startTokenId = publicCollection.nextTokenId();
         publicCollection.mint(msg.sender, amount);

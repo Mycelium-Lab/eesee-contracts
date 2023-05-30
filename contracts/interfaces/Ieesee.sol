@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "./IeeseeMinter.sol";
 import "./IRoyaltyEngineV1.sol";
+import "./IAggregationRouterV5.sol";
 
 interface Ieesee {
     /**
@@ -65,19 +65,6 @@ interface Ieesee {
         IERC721 collection;
         address earningsCollector;
         uint256 fee;
-    }
-
-    /**
-     * @dev SwapDescription: 1inch swap description
-     */
-    struct SwapDescription {
-        IERC20 srcToken;
-        IERC20 dstToken;
-        address payable srcReceiver;
-        address payable dstReceiver;
-        uint256 amount;
-        uint256 minReturnAmount;
-        uint256 flags;
     }
 
     event ListItem(
