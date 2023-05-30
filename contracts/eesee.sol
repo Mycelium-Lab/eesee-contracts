@@ -288,10 +288,11 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
             bytes memory payload = abi.encode(ID, listing.maxTickets);
             uint256 denominator_MATIC_USD = 10^priceFeed_MATIC_USD.decimals();
             uint256 denominator_ETH_USD = 10^priceFeed_ETH_USD.decimals();
-            uint256 networkBaseFee = 40000000000000;//TODO:calc
+            uint256 networkBaseFee = 48693703845972;//TODO: calc for mainnet
             // uint256 MATIC_ETH = (MATIC_USD / denominator_MATIC_USD) / (ETH_USD / denominator_ETH_USD);
-            //Note: This contract must have [130000 gas limit * 500 gwei] Matic. We multiply by {MATIC_ETH} to get amount in ETH.
-            uint256 executionFee = 130000 * 500 gwei * uint256(MATIC_USD) * denominator_ETH_USD / denominator_MATIC_USD / uint256(ETH_USD);
+            //Note: This contract must have [130000 gas limit * 1000 gwei] Matic. We multiply by {MATIC_ETH} to get amount in ETH.
+            //TODO: this is not a good design
+            uint256 executionFee = 130000 * 1000 gwei * uint256(MATIC_USD) * denominator_ETH_USD / denominator_MATIC_USD / uint256(ETH_USD);
             gasService.payNativeGasForContractCall{value: networkBaseFee + executionFee}(
                 address(this),
                 destinationChain,
@@ -614,7 +615,6 @@ contract eesee is Ieesee, AxelarExecutable, ERC721Holder, Ownable {
      * @param sourceAddress - The address this function was called from.
      * @param payload - {ID, chosenTicket} abi encoded.
      */
-    //TODO: get execute gasLimit for better approximation
      function _execute(
         string calldata sourceChain,
         string calldata sourceAddress,

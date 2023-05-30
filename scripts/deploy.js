@@ -161,7 +161,7 @@ async function main() {
             '0x326C977E6efc84E512bB9C30f76E30c160eD06FB',//ChainLink token
             '0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f',//500 gwei hash
             13,//minimumRequestConfirmations
-            200000//callbackGasLimit//TODO: test
+            170000//callbackGasLimit
         ]
     }else if(network.name === 'ethereum'){
         args = [
@@ -174,7 +174,7 @@ async function main() {
             '0xb0897686c545045aFc77CF20eC7A532E3120E0F1',//ChainLink token
             '0xcc294a196eeeb44da2888d17c0625cc88d70d9760a69d58d853ba6581a9ab0cd',//500 gwei hash
             13,//minimumRequestConfirmations
-            200000//callbackGasLimit//TODO: test
+            170000//callbackGasLimit
         ]
     }
     const _eeseeRandomETH = await eeseeRandomETH.connect(polygonWallet).deploy(...args)
@@ -183,7 +183,7 @@ async function main() {
     if(network.name === 'goerli'){
         await polygonWallet.sendTransaction({
             to: _eeseeRandomETH.address,
-            value: ethers.utils.parseEther('40', 'ether')
+            value: ethers.utils.parseEther('100', 'ether')
         });
         console.log(7)
 
@@ -192,7 +192,7 @@ async function main() {
         await tx.wait(1)
         console.log(8)
 
-        tx = await _eeseeRandomETH.connect(polygonWallet).fund(ethers.utils.parseEther('2', 'ether'))//TODO:more
+        tx = await _eeseeRandomETH.connect(polygonWallet).fund(ethers.utils.parseEther('2', 'ether'))
         await tx.wait(1)
         console.log(9)
 

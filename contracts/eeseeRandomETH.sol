@@ -39,7 +39,7 @@ contract eeseeRandomETH is VRFConsumerBaseV2, AxelarExecutable {
     ///@dev Chainlink VRF V2 request confirmations.
     uint16 immutable public minimumRequestConfirmations;
     ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
-    uint32 immutable private callbackGasLimit;//TODO: test
+    uint32 immutable private callbackGasLimit;
 
     constructor(
         address _gateway, 
@@ -72,7 +72,6 @@ contract eeseeRandomETH is VRFConsumerBaseV2, AxelarExecutable {
 
     // ============ Internal Methods ============
 
-    //TODO: get execute gasLimit for better approximation
     function _execute(
         string calldata sourceChain,
         string calldata sourceAddress,
@@ -99,9 +98,10 @@ contract eeseeRandomETH is VRFConsumerBaseV2, AxelarExecutable {
         require(answer > 0, "eesee: Unstable pricing");
 
         uint256 numerator = 10^priceFeed_MATIC_ETH.decimals();
-        uint256 networkBaseFee = 45000000000000;//TODO: calc with sdk
+        uint256 networkBaseFee = 1045291489992079548;//TODO: calc for mainnet
         //Note: This contract must have [80000 gas limit * 500 gwei] ETH. We divide by {answer} to get amount in Matic.
         //TODO: This is too low for some reason
+        //TODO: this is not a good design
         uint256 executionFee = 80000 * 500 gwei * numerator / uint256(answer);
         gasService.payNativeGasForContractCall{value: networkBaseFee + executionFee}(
             address(this),
