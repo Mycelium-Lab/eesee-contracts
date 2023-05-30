@@ -280,7 +280,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             bytes4(swapData[:4]) != IAggregationRouterV5.swap.selector || 
             desc.srcToken == ESE || 
             desc.dstToken != ESE || 
-            (desc.dstReceiver != address(this) && desc.dstReceiver != address(0))
+            desc.dstReceiver != address(this)
         ) revert InvalidSwapDescription();
 
         bool isETH = (address(desc.srcToken) == address(0) || address(desc.srcToken) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));

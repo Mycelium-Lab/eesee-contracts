@@ -48,7 +48,6 @@ const {
         royaltyEninge = await _royaltyEngine.deploy();
         await royaltyEninge.deployed()
 
-        //TODO: transfer ESE&&TEST tokens to it
         mock1InchExecutor = await _mock1InchExecutor.deploy(ESE.address, ERC20.address);
         await mock1InchExecutor.deployed()
         await ESE.transfer(mock1InchExecutor.address, '1000000000000000000000000')
@@ -514,35 +513,170 @@ const {
         const currentListingID = (await eesee.getListingsLength()).toNumber()
         await eesee.connect(signer).mintAndListItem(
             'contract/',
-            5,
+            10,
             50,
             86400,
             royaltyCollector.address,
             300
         )
 
-        await ERC20.approve(eesee.address, '101')
+        await ERC20.approve(eesee.address, '232')
 
         let iface = new ethers.utils.Interface([
-            'function swap(address executor, tuple(address srcToken, address dstToken, address srcReceiver, address dstReceiver, uint amount, uint minReturnAmount, uint flags) desc, bytes permit, bytes data)'
+            'function swap(address executor, tuple(address srcToken, address dstToken, address srcReceiver, address dstReceiver, uint amount, uint minReturnAmount, uint flags) desc, bytes permit, bytes data)',
+            'function swep(address executor, tuple(address srcToken, address dstToken, address srcReceiver, address dstReceiver, uint amount, uint minReturnAmount, uint flags) desc, bytes permit, bytes data)'
         ]);
-        const swapData = iface.encodeFunctionData('swap', [
+        
+        let swapData = iface.encodeFunctionData('swap', [
             mock1InchExecutor.address, 
             {
-                srcToken: ERC20.address,//TODO: cant be ESE //ADDRESS
-                dstToken: ESE.address,//TODO: has to be ESE //ADDRESS
-                srcReceiver: mock1InchExecutor.address,//TODO: check 0 //ADDRESS
-                dstReceiver: eesee.address, //ADDRESS
-                amount: 101, //should buy 2 tickets//UINT256
-                minReturnAmount: 1,//UINT256
-                flags: 0,//UINT256
+                srcToken: ESE.address,//
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232, 
+                minReturnAmount: 100,
+                flags: 0,
             }, 
-            '0x00',//bytes
-            '0x00'//bytes
+            '0x00',
+            '0x00'
         ])
-        console.log(swapData)
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
 
-        await eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData)
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ERC20.address,//
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address,
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: ERC20.address, //
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
+
+        swapData = iface.encodeFunctionData('swep', [//
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 1}))//
+        .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232, //should buy 2 tickets + 10 ESE dust + (10-1) ERC20 dust 
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+
+        const balanceBefore = await ESE.balanceOf(signer.address)
+        const balanceBefore_ = await ERC20.balanceOf(signer.address)
+
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 0, 50)
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 1, 50)
+
+        const balanceAfter = await ESE.balanceOf(signer.address)
+        const balanceAfter_ = await ERC20.balanceOf(signer.address)
+
+        assert.equal(balanceAfter.sub(balanceBefore).toString(), "10", 'ESE balance is correct')
+        assert.equal(balanceBefore_.sub(balanceAfter_).toString(), "223", 'ERC20 balance is correct')
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: zeroAddress,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 212, //should buy 2 tickets + 10 ESE dust + (10-1) ERC20 dust 
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 211}))//
+        .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
+
+
+        swapData = iface.encodeFunctionData('swap', [//TODO:check eth transfer
+            mock1InchExecutor.address, 
+            {
+                srcToken: zeroAddress,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 212, //should buy 2 tickets + 10 ESE dust + (10-1) ERC20 dust 
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 212}))
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 2, 50)
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 3, 50)
+        //todo: InvalidMsgValue
     })
 
     it('Changes constants', async () => {

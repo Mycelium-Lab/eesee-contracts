@@ -9,21 +9,22 @@ contract Mock1InchExecutor {
         ESE = _ESE;
         token = _token;
     }
-    fallback(bytes calldata data) external payable returns (bytes memory) {
-        (address msgSender, bytes memory _data, uint256 amount) =  abi.decode(data[4:], (address, bytes, uint256));
+    /*fallback(bytes calldata data) external payable returns (bytes memory) {
+        (address msgSender, bytes memory data, uint256 amount) =  abi.decode(data[4:], (address, bytes, uint256));
         if(msg.value > 0){
             ESE.transfer(msg.sender, msg.value * 2);
         }else{
             ESE.transfer(msg.sender, amount / 2);
         }
-    }
-
-    /*function execute(address msgSender, bytes memory data, uint256 amount) external payable {
-        if(msg.value > 0){
-            ESE.transfer(msg.sender, msg.value * 2);
-        }else{
-            token.transferFrom(msg.sender, address(this), amount);
-        }
-        ESE.transfer(msg.sender, amount / 2);
     }*/
+
+    function execute(address msgSender, bytes memory data, uint256 amount) external payable {
+        if(msg.value > 0){
+            (bool success, ) = msg.sender.call{value: 10, gas: 5000}("");
+            ESE.transfer(msg.sender, (msg.value - 10) * 2);
+        }else{
+            token.transfer(msg.sender, 10);
+            ESE.transfer(msg.sender, (amount - 10) / 2);
+        }
+    }
 }

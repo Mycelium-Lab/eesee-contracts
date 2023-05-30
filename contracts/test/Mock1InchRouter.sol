@@ -48,7 +48,7 @@ library UniERC20 {
 /// @title Interface for making arbitrary calls during swap
 interface IAggregationExecutor {
     /// @notice propagates information about original msg.sender and executes arbitrary data
-    function execute(address msgSender) external payable;  // 0x4b64e492
+    function execute(address msgSender, bytes memory data, uint256 amount) external payable;  // 0x4b64e492
 }
 
 
@@ -113,7 +113,7 @@ contract Mock1InchRouter {
             srcToken.safeTransferFrom(msg.sender, desc.srcReceiver, desc.amount);//NO
         }
 
-        _execute(executor, msg.sender, desc.amount, data);
+        executor.execute(msg.sender, data, desc.amount);
 
         spentAmount = desc.amount;
         // we leave 1 wei on the router for gas optimisations reasons
@@ -121,33 +121,16 @@ contract Mock1InchRouter {
         if (returnAmount == 0) revert ZeroReturnAmount();
         unchecked { returnAmount--; }
 
-        if (returnAmount < desc.minReturnAmount) revert ReturnAmountIsNotEnough();
+        uint256 unspentAmount = srcToken.uniBalanceOf(address(this));
+        if (unspentAmount > 1) {
+            // we leave 1 wei on the router for gas optimisations reasons
+            unchecked { unspentAmount--; }
+            spentAmount -= unspentAmount;
+            srcToken.uniTransfer(payable(msg.sender), unspentAmount);
+        }
+        if (returnAmount * desc.amount < desc.minReturnAmount * spentAmount) revert ReturnAmountIsNotEnough();
 
         address payable dstReceiver = (desc.dstReceiver == address(0)) ? payable(msg.sender) : desc.dstReceiver;
         dstToken.uniTransfer(dstReceiver, returnAmount);
-    }
-
-    function _execute(
-        IAggregationExecutor executor,
-        address srcTokenOwner,
-        uint256 inputAmount,
-        bytes calldata data
-    ) private {
-        bytes4 executeSelector = executor.execute.selector;
-        /// @solidity memory-safe-assembly
-        assembly {  // solhint-disable-line no-inline-assembly
-            let ptr := mload(0x40)//free memory pointer
-
-            mstore(ptr, executeSelector) //first 4 bytes are selector
-            mstore(add(ptr, 0x04), srcTokenOwner) //then srcTokenOwner
-            calldatacopy(add(ptr, 0x24), data.offset, data.length) //Copy data to next bytes
-            mstore(add(add(ptr, 0x24), data.length), inputAmount) //then add inputAmount
-
-            //calls executor with all available gas and provided value, ptr value. No output. If 0 - error
-            if iszero(call(gas(), executor, callvalue(), ptr, add(0x44, data.length), 0, 0)) {
-                returndatacopy(ptr, 0, returndatasize())
-                revert(ptr, returndatasize())
-            }
-        }
     }
 }
