@@ -38,9 +38,7 @@ contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
      */
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         bytes memory str = bytes(tokenURIs[tokenId]);
-        if(str.length == 0){
-            return super.tokenURI(tokenId);
-        }
+        if(str.length == 0) return super.tokenURI(tokenId);
         return tokenURIs[tokenId];
     }
 
