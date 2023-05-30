@@ -43,7 +43,7 @@ abstract contract FinalizableCrowdsale is TimedCrowdsale {
      * should call super._finalization() to ensure the chain of finalization is
      * executed entirely.
      */
-    function _finalization() internal {
+    function _finalization() internal virtual {
         // solhint-disable-previous-line no-empty-blocks
     }
 }

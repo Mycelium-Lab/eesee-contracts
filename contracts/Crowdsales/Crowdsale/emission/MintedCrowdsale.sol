@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol"
  * @dev Extension of Crowdsale contract whose tokens are minted in each purchase.
  * Token ownership should be transferred to MintedCrowdsale for minting.
  */
-contract MintedCrowdsale is Crowdsale {
+abstract contract MintedCrowdsale is Crowdsale {
     
     /**
      * @dev Overrides delivery by minting tokens upon purchase.
@@ -17,9 +17,6 @@ contract MintedCrowdsale is Crowdsale {
      */
     function _deliverTokens(address beneficiary, uint256 tokenAmount) internal override {
         // Potentially dangerous assumption about the type of the token.
-        require(
-            ERC20PresetMinterPauser(address(token())).mint(beneficiary, tokenAmount);,
-                "MintedCrowdsale: minting failed"
-        );
+        ERC20PresetMinterPauser(address(token())).mint(beneficiary, tokenAmount);
     }
 }

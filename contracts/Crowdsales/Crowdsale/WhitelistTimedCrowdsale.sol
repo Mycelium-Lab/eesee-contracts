@@ -1,12 +1,12 @@
 pragma solidity 0.8.17;
 
-import "../Crowdsale.sol";
+import "./WhitelistCrowdsale.sol";
 
 /**
  * @title TimedCrowdsale
  * @dev Crowdsale accepting contributions only within a time frame.
  */
-abstract contract TimedCrowdsale is Crowdsale {
+abstract contract WhitelistTimedCrowdsale is WhitelistCrowdsale {
 
     uint256 private _openingTime;
     uint256 private _closingTime;

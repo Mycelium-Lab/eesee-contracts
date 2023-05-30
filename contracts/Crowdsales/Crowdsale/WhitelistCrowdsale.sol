@@ -17,7 +17,7 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
  * the methods to add functionality. Consider using 'super' where appropriate to concatenate
  * behavior.
  */
-abstract contract Crowdsale is Context, ReentrancyGuard {
+abstract contract WhitelistCrowdsale is Context, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // The token being sold
@@ -35,7 +35,7 @@ abstract contract Crowdsale is Context, ReentrancyGuard {
     // Amount of wei raised
     uint256 internal _weiRaised;
 
-
+    bytes32 private _whiteListMerkleRoot;
     /**
      * Event for token purchase logging
      * @param purchaser who paid for the tokens
@@ -53,16 +53,21 @@ abstract contract Crowdsale is Context, ReentrancyGuard {
      * @param __wallet Address where collected funds will be forwarded to
      * @param __token Address of the token being sold
      */
-    constructor (uint256 __rate, address payable __wallet, IERC20 __token) {
+    constructor (uint256 __rate, address payable __wallet, IERC20 __token, bytes32 __whiteListMerkleRoot) {
         require(__rate > 0, "Crowdsale: rate is 0");
         require(__wallet != address(0), "Crowdsale: wallet is the zero address");
         require(address(__token) != address(0), "Crowdsale: token is the zero address");
-
+        require(__whiteListMerkleRoot != bytes32(0), "Crowdsale: whiteList is zero bytes");
+        
+        _whiteListMerkleRoot = __whiteListMerkleRoot;
         _rate = __rate;
         _wallet = __wallet;
         _token = __token;
     }
 
+    function whiteListMerkleRoot() public view returns (bytes32) {
+        return _whiteListMerkleRoot;
+    }
     /**
      * @return the token being sold.
      */
@@ -91,13 +96,19 @@ abstract contract Crowdsale is Context, ReentrancyGuard {
         return _weiRaised;
     }
 
+    function verifyCanPurchase(address claimer, bytes32[] memory merkleProof) public view returns (bool) {
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(claimer))));
+        return MerkleProof.verify(merkleProof, _whiteListMerkleRoot, leaf);
+    }
+
     /**
      * @dev low level token purchase ***DO NOT OVERRIDE***
      * This function has a non-reentrancy guard, so it shouldn't be called by
      * another `nonReentrant` function.
      * @param beneficiary Recipient of the token purchase
      */
-    function buyTokens(address beneficiary) public virtual nonReentrant payable {
+    function buyTokens(address beneficiary, bytes32[] memory merkleProof) public virtual nonReentrant payable {
+        require(verifyCanPurchase(beneficiary, merkleProof), "Crowdsale: beneficiary address is not in the whitelist");
         uint256 weiAmount = msg.value;
         _preValidatePurchase(beneficiary, weiAmount);
 

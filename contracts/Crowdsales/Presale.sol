@@ -1,41 +1,43 @@
 pragma solidity 0.8.17;
 
-import './Crowdsale/Crowdsale.sol';
-import './Crowdsale/validation/CappedCrowdsale.sol';
-import './Crowdsale/validation/WhitelistCrowdsale.sol';
-import './Crowdsale/validation/TimedCrowdsale.sol';
-import './Crowdsale/emission/MintedCrowdsale.sol';
-import './MinPurchaseAmountCrowdsale.sol';
+import './Crowdsale/WhitelistCrowdsale.sol';
+import './Crowdsale/WhitelistCappedCrowdsale.sol';
+import './Crowdsale/WhitelistTimedCrowdsale.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '../ESE.sol';
-contract Presale is Crowdsale, MintedCrowdsale, MinPurchaseAmountCrowdsale, CappedCrowdsale, TimedCrowdsale, WhitelistCrowdsale {
+
+contract Presale is WhitelistCrowdsale, WhitelistCappedCrowdsale, WhitelistTimedCrowdsale {
     uint256 public privateRoundPercent = 2000;
     uint256 public liquidityAddedPercent = 5000;
     uint256 public oneYear = 86400 * 365;
+    uint256 public minPurchaseAmount;
     constructor(
         uint256 rate,
         address payable wallet,
         IERC20 token,
-        uint256 minPurchaseAmount,
+        uint256 _minPurchaseAmount,
         uint256 cap,
         uint256 openingTime,
         uint256 closingTime,
         bytes32 whiteListMerkleRoot
     )
-        MintedCrowdsale()
-        Crowdsale(rate, wallet, token)
-        MinPurchaseAmountCrowdsale(minPurchaseAmount)
-        CappedCrowdsale(cap)
-        TimedCrowdsale(openingTime, closingTime)
-        WhitelistCrowdsale(whiteListMerkleRoot)
+        WhitelistCrowdsale(rate, wallet, token, whiteListMerkleRoot)
+        WhitelistCappedCrowdsale(cap)
+        WhitelistTimedCrowdsale(openingTime, closingTime)
     {
-
+        require(minPurchaseAmount <= cap, "Crowdsale: minimum purchase amount can't be more than cap");
+        minPurchaseAmount = _minPurchaseAmount;
+    }
+    function _preValidatePurchase(address beneficiary, uint256 weiAmount) internal onlyWhileOpen override(WhitelistCappedCrowdsale, WhitelistTimedCrowdsale, WhitelistCrowdsale) view {
+        require(weiAmount >= minPurchaseAmount, "Crowdsale: you can't buy less than minimum purchase amount.");
+        super._preValidatePurchase(beneficiary, weiAmount);
+        require(weiRaised() + weiAmount <= cap(), "CappedCrowdsale: cap exceeded");
     }
     function _deliverTokens(
         address _beneficiary,
         uint256 _tokenAmount
     )
-        internal
+        internal override
     {
         ESE _token = ESE(address(token()));
         _token.transfer(_beneficiary, _tokenAmount);

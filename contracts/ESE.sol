@@ -3,18 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-
-contract TimedCrowdsale {
-    bool closed;
-
-    function setHasClosed(bool value) public {
-        closed = value;
-    }
-
-    function hasClosed() public view returns (bool) {
-        return closed;
-    }
-}
+import "./Crowdsales/Crowdsale/WhitelistTimedCrowdsale.sol";
 
 contract ESE is ERC20, Ownable {
     struct LockedTokens {
@@ -27,7 +16,7 @@ contract ESE is ERC20, Ownable {
     mapping(address => uint256) public lockedTokensAmount;
 
     address[] public crowdsales;
-    TimedCrowdsale public privateCrowdsale;
+    WhitelistTimedCrowdsale public privateCrowdsale;
     bool public areCrowdsalesSet;
     uint256 public presaleLiquidityUnlockTimestamp;
     bool public isPresaleLiquidityUnlocked;
@@ -56,7 +45,7 @@ contract ESE is ERC20, Ownable {
             }
         }
         require(
-            isMsgSenderCrowdsale,
+            isMsgSenderCrowdsale || msg.sender == address(privateCrowdsale),
             "ESE: only crowdsale contracts can lock tokens"
         );
         _;
@@ -109,7 +98,7 @@ contract ESE is ERC20, Ownable {
     ) public onlyOwner {
         require(!areCrowdsalesSet, "ESE: crowdsales have already been set");
         crowdsales = _crowdsales;
-        privateCrowdsale = TimedCrowdsale(_privateCrowdsale);
+        privateCrowdsale = WhitelistTimedCrowdsale(_privateCrowdsale);
         areCrowdsalesSet = true;
         emit SetCrowdsales(crowdsales, _privateCrowdsale);
     }

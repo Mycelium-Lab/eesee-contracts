@@ -1,12 +1,12 @@
 pragma solidity 0.8.17;
 
-import "../Crowdsale.sol";
+import "./WhitelistCrowdsale.sol";
 
 /**
  * @title CappedCrowdsale
  * @dev Crowdsale with a limit for total contributions.
  */
-abstract contract CappedCrowdsale is Crowdsale {
+abstract contract WhitelistCappedCrowdsale is WhitelistCrowdsale {
 
     uint256 private _cap;
 
