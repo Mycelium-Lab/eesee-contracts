@@ -205,6 +205,7 @@ interface Ieesee {
 
     error SwapNotSuccessful();
     error TransferNotSuccessful();
+    error EthDepositRejected();
 
     function listings(uint256) external view returns(
         uint256 ID,

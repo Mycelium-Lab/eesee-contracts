@@ -50,6 +50,11 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     ///@dev 1inch router used for token swaps.
     address immutable public OneInchRouter;
 
+    receive() external payable {
+        //Reject deposits from EOA
+        if (msg.sender == tx.origin) revert EthDepositRejected();
+    }
+
     constructor(
         IERC20 _ESE,
         IeeseeMinter _minter,
@@ -275,7 +280,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return ticketsBought - Tickets bought.
      */
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external payable returns(uint256 tokensSpent, uint256 ticketsBought){
-        (,IAggregationRouterV5.SwapDescription memory desc,,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes, bytes));
+        (address executor,IAggregationRouterV5.SwapDescription memory desc, bytes memory permit, bytes memory data) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes, bytes));
         if(
             bytes4(swapData[:4]) != IAggregationRouterV5.swap.selector || 
             desc.srcToken == ESE || 
@@ -291,11 +296,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
             desc.srcToken.transferFrom(msg.sender, address(this), desc.amount);
             desc.srcToken.approve(OneInchRouter, desc.amount);
         }
-
-        (bool success, bytes memory data) = OneInchRouter.call{value: msg.value}(swapData);
-        if(!success) revert SwapNotSuccessful();
         uint256 returnAmount;
-        (returnAmount, tokensSpent) = abi.decode(data, (uint256, uint256));
+        (returnAmount, tokensSpent) = IAggregationRouterV5(OneInchRouter).swap{value: msg.value}(executor, desc, permit, data);
 
         Listing storage listing = listings[ID];
         ticketsBought = returnAmount / listing.ticketPrice;
@@ -308,7 +310,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         }
         if(desc.amount > tokensSpent){
             if(isETH){
-                (success, ) = msg.sender.call{value: desc.amount - tokensSpent, gas: 5000}("");
+                (bool success, ) = msg.sender.call{value: desc.amount - tokensSpent, gas: 5000}("");
                 if(!success) revert TransferNotSuccessful();
             }else{
                 desc.srcToken.transfer(address(msg.sender), desc.amount - tokensSpent);

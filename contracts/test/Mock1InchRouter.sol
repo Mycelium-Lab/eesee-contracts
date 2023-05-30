@@ -113,7 +113,7 @@ contract Mock1InchRouter {
             srcToken.safeTransferFrom(msg.sender, desc.srcReceiver, desc.amount);//NO
         }
 
-        executor.execute(msg.sender, data, desc.amount);
+        executor.execute{value:msg.value}(msg.sender, data, desc.amount);
 
         spentAmount = desc.amount;
         // we leave 1 wei on the router for gas optimisations reasons
@@ -125,7 +125,7 @@ contract Mock1InchRouter {
         if (unspentAmount > 1) {
             // we leave 1 wei on the router for gas optimisations reasons
             unchecked { unspentAmount--; }
-            spentAmount -= unspentAmount;
+            spentAmount -= unspentAmount;//212 - 9 = 203
             srcToken.uniTransfer(payable(msg.sender), unspentAmount);
         }
         if (returnAmount * desc.amount < desc.minReturnAmount * spentAmount) revert ReturnAmountIsNotEnough();

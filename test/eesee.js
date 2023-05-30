@@ -13,7 +13,7 @@ const {
     let mockVRF;
     let eesee;
     let NFT;
-    let signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector;
+    let signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, acc9, feeCollector;
     let ticketBuyers;
     let minter;
     let royaltyEninge;
@@ -23,7 +23,7 @@ const {
     const zeroAddress = "0x0000000000000000000000000000000000000000"
   
     this.beforeAll(async() => {
-        [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector, royaltyCollector] = await ethers.getSigners()
+        [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, acc9, feeCollector, royaltyCollector] = await ethers.getSigners()
         ticketBuyers = [acc2,acc3, acc4, acc5, acc6,  acc7]
         const _ESE = await hre.ethers.getContractFactory("ESE");
         const _mockVRF = await hre.ethers.getContractFactory("MockVRFCoordinator");
@@ -657,7 +657,6 @@ const {
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 211}))//
         .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
 
-
         swapData = iface.encodeFunctionData('swap', [//TODO:check eth transfer
             mock1InchExecutor.address, 
             {
@@ -665,7 +664,7 @@ const {
                 dstToken: ESE.address,
                 srcReceiver: mock1InchExecutor.address,
                 dstReceiver: eesee.address, 
-                amount: 212, //should buy 2 tickets + 10 ESE dust + (10-1) ERC20 dust 
+                amount: 64, //should buy 2 tickets + 8 ESE dust + (10-1) ETH dust
                 minReturnAmount: 100,
                 flags: 0,
             }, 
@@ -673,10 +672,20 @@ const {
             '0x00'
         ])
 
-        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 212}))
-            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 2, 50)
-            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 3, 50)
-        //todo: InvalidMsgValue
+        const _balanceBefore = await ESE.balanceOf(acc9.address)
+        const _balanceBefore_ = await ethers.provider.getBalance(acc9.address);
+
+        const tx = await eesee.connect(acc9).buyTicketsWithSwap(currentListingID, swapData, {value: 64})
+        const rr = await tx.wait()
+        await expect(tx)
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, acc9.address, 2, 50)
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, acc9.address, 3, 50)
+
+        const _balanceAfter = await ESE.balanceOf(acc9.address)
+        const _balanceAfter_ = await ethers.provider.getBalance(acc9.address);
+
+        assert.equal(_balanceAfter.sub(_balanceBefore).toString(), "8", 'ESE balance is correct')
+        assert.equal(_balanceBefore_.sub(_balanceAfter_).sub(rr.gasUsed.mul(rr.effectiveGasPrice)).toString(), "55", 'ERC20 balance is correct')
     })
 
     it('Changes constants', async () => {
