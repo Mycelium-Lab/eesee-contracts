@@ -46,7 +46,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     uint32 immutable private callbackGasLimit;
 
     ///@dev The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract.
-    IRoyaltyEngineV1 immutable private royaltyEngine;
+    IRoyaltyEngineV1 immutable public royaltyEngine;
+    ///@dev 1inch router used for token swaps.
+    address immutable public OneInchRouter;
 
     constructor(
         IERC20 _ESE,
@@ -57,7 +59,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         LinkTokenInterface _LINK,
         bytes32 _keyHash,
         uint16 _minimumRequestConfirmations,
-        uint32 _callbackGasLimit
+        uint32 _callbackGasLimit,
+        address _OneInchRouter
     ) VRFConsumerBaseV2(_vrfCoordinator) {
         ESE = _ESE;
         minter = _minter;
@@ -72,6 +75,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         keyHash = _keyHash;
         minimumRequestConfirmations = _minimumRequestConfirmations;
         callbackGasLimit = _callbackGasLimit;
+
+        OneInchRouter = _OneInchRouter;
 
         //Create dummy listings at index 0
         listings.push();
@@ -109,10 +114,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256[] memory ticketPrices, 
         uint256[] memory durations
     ) external returns(uint256[] memory IDs){
-        require(
-            nfts.length == maxTickets.length && maxTickets.length == ticketPrices.length && ticketPrices.length == durations.length, 
-            "eesee: Arrays don't match lengths"
-        );
+        if(nfts.length != maxTickets.length || maxTickets.length != ticketPrices.length || ticketPrices.length != durations.length){
+            revert InvalidArrayLengths();
+        }
         IDs = new uint256[](nfts.length);
         for(uint256 i = 0; i < nfts.length; i++) {
             nfts[i].collection.safeTransferFrom(msg.sender, address(this), nfts[i].tokenID);
@@ -173,7 +177,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs){
-        require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
+        if(maxTickets.length != ticketPrices.length || maxTickets.length != durations.length){
+            revert InvalidArrayLengths();
+        }
         (collection, tokenIDs) = minter.mintToPublicCollection(maxTickets.length, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
 
         IDs = new uint256[](maxTickets.length);
@@ -242,7 +248,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs){
-        require(maxTickets.length == ticketPrices.length && maxTickets.length == durations.length, "eesee: Arrays don't match lengths");
+        if(maxTickets.length != ticketPrices.length || maxTickets.length != durations.length){
+            revert InvalidArrayLengths();
+        }
         (collection, tokenIDs) = minter.mintToPrivateCollection(maxTickets.length, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
         
         IDs = new uint256[](maxTickets.length);
@@ -259,31 +267,67 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return tokensSpent - ESE tokens spent.
      */
     function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent){
-        require(amount > 0, "eesee: Amount must be above zero");
-        Listing storage listing = listings[ID];
-        require(listing.owner != address(0), "eesee: Listing does not exist");
-        require(block.timestamp <= listing.creationTime + listing.duration, "eesee: Listing has already expired");
-
-        tokensSpent = listing.ticketPrice * amount;
+        tokensSpent = _buyTickets(ID, amount);
         ESE.safeTransferFrom(msg.sender, address(this), tokensSpent);
+    }
 
-        for(uint256 i; i < amount; i++){
-            emit BuyTicket(ID, msg.sender, listing.ticketsBought, listing.ticketPrice);
-            listing.ticketIDBuyer[listing.ticketsBought] = msg.sender;
-            listing.ticketsBought += 1;
+    /**
+     * @dev Buys tickets with any token using 1inch'es router and swapping it for ESE. Requests Chainlink to generate random words if all tickets have been bought. Emits {BuyTicket} event for each ticket bought.
+     * @param ID - ID of a listing to buy tickets for.
+     * @param swapData - Data for 1inch swap. 
+     
+     * @return tokensSpent - Tokens spent.
+     * @return ticketsBought - Tickets bought.
+     */
+    function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external payable returns(uint256 tokensSpent, uint256 ticketsBought){
+        (,SwapDescription memory desc,,) = abi.decode(swapData[4:], (address, SwapDescription, bytes, bytes));
+        if(
+            bytes4(swapData[:4]) != bytes4(0x12aa3caf) || 
+            desc.srcToken == ESE || 
+            desc.dstToken != ESE || 
+            (desc.dstReceiver != address(this) && desc.dstReceiver != address(0))
+        ){
+            revert InvalidSwapDescription();
         }
-        listing.ticketsBoughtByAddress[msg.sender] += amount;
 
-        //Allow buy single tickets even if bought amount is more than maxTicketsBoughtByAddress
-        if(listing.ticketsBoughtByAddress[msg.sender] > 1){
-            require(listing.ticketsBoughtByAddress[msg.sender] * 1 ether / listing.maxTickets <= maxTicketsBoughtByAddress, "eesee: Max tickets bought by this address");
+        bool isETH = (address(desc.srcToken) == address(0) || address(desc.srcToken) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        if(isETH){
+            if(msg.value != desc.amount){
+                revert InvalidMsgValue();
+            }
+        }else{
+            if(msg.value != 0){
+                revert InvalidMsgValue();
+            }
+            desc.srcToken.transferFrom(msg.sender, address(this), desc.amount);
+            desc.srcToken.approve(OneInchRouter, desc.amount);
         }
-        require(listing.ticketsBought <= listing.maxTickets, "eesee: All tickets bought");
 
-        if(listing.ticketsBought == listing.maxTickets){
-            uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
-            chainlinkRequestIDs[requestID] = ID;
-            emit RequestWords(ID, requestID);
+        (bool success, bytes memory data) = OneInchRouter.call{value: msg.value}(swapData);
+        if(!success){
+            revert SwapNotSuccessful();
+        }
+        uint256 returnAmount;
+        (returnAmount, tokensSpent) = abi.decode(data, (uint256, uint256));
+
+        Listing storage listing = listings[ID];
+        ticketsBought = returnAmount / listing.ticketPrice;
+        _buyTickets(ID, ticketsBought);
+
+        // Refund dust
+        uint256 ESEPaid = ticketsBought * listing.ticketPrice;
+        if(returnAmount > ESEPaid){
+            ESE.transfer(address(msg.sender), returnAmount - ESEPaid); 
+        }
+        if(desc.amount > tokensSpent){
+            if(isETH){
+                (success, ) = msg.sender.call{value: desc.amount - tokensSpent, gas: 5000}("");
+                if(!success){
+                    revert TransferNotSuccessful();
+                }
+            }else{
+                desc.srcToken.transfer(address(msg.sender), desc.amount - tokensSpent);
+            }   
         }
     }
 
@@ -317,7 +361,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         IeeseeNFTDrop.StageOptions memory publicStageOptions,
         IeeseeNFTDrop.StageOptions[] memory presalesOptions
     ) external returns (uint256 ID, IERC721 collection){
-        require(earningsCollector != address(0), "eesee: Invalid earningsCollector");
+        if(earningsCollector == address(0)){
+            revert InvalidEarningsCollector();
+        }
         collection = minter.deployDropCollection(
             name,
             symbol,
@@ -350,7 +396,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return mintPrice - Amount of ESE tokens spent on minting.
      */
     function mintDrop(uint256 ID, uint256 quantity, bytes32[] memory merkleProof) external returns(uint256 mintPrice){
-        require(quantity > 0, "eesee: Quantity must be above zero");
+        if(quantity == 0){
+            revert InvalidQuantity();
+        }
         Drop storage drop = drops[ID];
 
         IeeseeNFTDrop _drop = IeeseeNFTDrop(address(drop.collection));
@@ -381,15 +429,22 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: Returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
     function batchReceiveItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
-        require(recipient != address(0), "eesee: Invalid recipient");
+        if(recipient == address(0)){
+            revert InvalidRecipient();
+        }
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
-            require(listing.winner == msg.sender, "eesee: Caller is not the winner");
-            require(!listing.itemClaimed, "eesee: Item has already been claimed");
+
+            if(msg.sender != listing.winner){
+                revert CallerNotWinner(ID);
+            }
+            if(listing.itemClaimed){
+                revert ItemAlreadyClaimed(ID);
+            }
 
             collections[i] = listing.nft.collection;
             tokenIDs[i] = listing.nft.tokenID;
@@ -412,13 +467,22 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return amount - ESE received.
      */
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
-        require(recipient != address(0), "eesee: Invalid recipient");
+        if(recipient == address(0)){
+            revert InvalidRecipient();
+        }
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
-            require(listing.winner != address(0), "eesee: Listing is not filfilled");
-            require(listing.owner == msg.sender, "eesee: Caller is not the owner");
-            require(!listing.tokensClaimed, "eesee: Tokens have already been claimed");
+
+            if(listing.winner == address(0)){
+                revert ListingNotFulfilled(ID);
+            }
+            if(msg.sender != listing.owner){
+                revert CallerNotOwner(ID);
+            }
+            if(listing.tokensClaimed){
+                revert TokensAlreadyClaimed(ID);
+            }
 
             listing.tokensClaimed = true;
             uint256 _amount = listing.ticketPrice * listing.maxTickets;
@@ -446,17 +510,28 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: returning an array of NFT structs gives me "Stack too deep" error for some reason, so I have to return it this way
      */
     function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs){
-        require(recipient != address(0), "eesee: Invalid recipient");
+        if(recipient == address(0)){
+            revert InvalidRecipient();
+        }
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
-            require(msg.sender == listing.owner, "eesee: Caller is not the owner");
-            require(block.timestamp > listing.creationTime + listing.duration, "eesee: Listing has not expired yet");
-            require(!listing.itemClaimed, "eesee: Item has already been claimed");
-            require(listing.winner == address(0), "eesee: Listing is already filfilled");
+
+            if(msg.sender != listing.owner){
+                revert CallerNotOwner(ID);
+            }
+            if(block.timestamp <= listing.creationTime + listing.duration){
+                revert ListingNotExpired(ID);
+            }
+            if(listing.itemClaimed){
+                revert ItemAlreadyClaimed(ID);
+            }
+            if(listing.winner != address(0)){
+                revert ListingAlreadyFulfilled(ID);
+            }
 
             collections[i] = listing.nft.collection;
             tokenIDs[i] = listing.nft.tokenID;
@@ -479,14 +554,23 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return amount - ESE received.
      */
     function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
-        require(recipient != address(0), "eesee: Invalid recipient");
+        if(recipient == address(0)){
+            revert InvalidRecipient();
+        }
         for(uint256 i; i < IDs.length; i++){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
             uint256 ticketsBoughtByAddress = listing.ticketsBoughtByAddress[msg.sender];
-            require(ticketsBoughtByAddress > 0, "eesee: No tickets bought");
-            require(block.timestamp > listing.creationTime + listing.duration, "eesee: Listing has not expired yet");
-            require(listing.winner == address(0), "eesee: Listing is already filfilled");
+
+            if(ticketsBoughtByAddress == 0){
+                revert NoTicketsBought(ID);
+            }
+            if(block.timestamp <= listing.creationTime + listing.duration){
+                revert ListingNotExpired(ID);
+            }
+            if(listing.winner != address(0)){
+                revert ListingAlreadyFulfilled(ID);
+            }
 
             listing.ticketsBought -= ticketsBoughtByAddress;
             listing.ticketsBoughtByAddress[msg.sender] = 0;
@@ -548,10 +632,18 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     // Note: Must be called after nft was minted/transfered
     function _listItem(NFT memory nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) internal returns(uint256 ID){
-        require(duration >= minDuration, "eesee: Duration must be more or equal minDuration");
-        require(duration <= maxDuration, "eesee: Duration must be less or equal maxDuration");
-        require(maxTickets >= 2, "eesee: Max tickets must be more or equal 2");
-        require(ticketPrice > 0, "eesee: Ticket price must be above zero");
+        if(duration < minDuration){
+            revert DurationTooLow(minDuration);
+        }
+        if(duration > maxDuration){
+            revert DurationTooHigh(maxDuration);
+        }
+        if(maxTickets < 2){
+            revert MaxTicketsTooLow();
+        }
+        if(ticketPrice == 0){
+            revert TicketPriceTooLow();
+        }
 
         ID = listings.length;
 
@@ -566,6 +658,44 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         listing.duration = duration;
 
         emit ListItem(ID, nft, listing.owner, maxTickets, ticketPrice, duration);
+    }
+
+    function _buyTickets(uint256 ID, uint256 amount) internal returns(uint256 tokensSpent){
+        if(amount == 0){
+            revert BuyAmountTooLow();
+        }
+        Listing storage listing = listings[ID];
+        if(listing.owner == address(0)){
+            revert ListingNotExists(ID);
+        }
+        if(block.timestamp > listing.creationTime + listing.duration){
+            revert ListingExpired(ID);
+        }
+
+        tokensSpent = listing.ticketPrice * amount;
+
+        for(uint256 i; i < amount; i++){
+            emit BuyTicket(ID, msg.sender, listing.ticketsBought, listing.ticketPrice);
+            listing.ticketIDBuyer[listing.ticketsBought] = msg.sender;
+            listing.ticketsBought += 1;
+        }
+        listing.ticketsBoughtByAddress[msg.sender] += amount;
+
+        //Allow buy single tickets even if bought amount is more than maxTicketsBoughtByAddress
+        if(listing.ticketsBoughtByAddress[msg.sender] > 1){
+            if(listing.ticketsBoughtByAddress[msg.sender] * 1 ether / listing.maxTickets > maxTicketsBoughtByAddress){
+                revert MaxTicketsBoughtByAddress(msg.sender);
+            }
+        }
+        if(listing.ticketsBought > listing.maxTickets){
+            revert AllTicketsBought();
+        }
+
+        if(listing.ticketsBought == listing.maxTickets){
+            uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
+            chainlinkRequestIDs[requestID] = ID;
+            emit RequestWords(ID, requestID);
+        }
     }
 
     function _collectRoyalties(uint256 value, NFT memory nft, address listingOwner) internal returns(uint256 royaltyAmount) {
@@ -600,7 +730,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256 ID = chainlinkRequestIDs[requestID];
         Listing storage listing = listings[ID];
 
-        require(block.timestamp <= listing.creationTime + listing.duration, "eesee: Listing has already expired");
+        if(block.timestamp > listing.creationTime + listing.duration){
+            revert ListingExpired(ID);
+        }
 
         uint256 chosenTicket = randomWords[0] % listing.maxTickets;
         listing.winner = listing.ticketIDBuyer[chosenTicket];
@@ -637,7 +769,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: This function can only be called by owner.
      */
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external onlyOwner {
-        require(_maxTicketsBoughtByAddress <= 1 ether, "eesee: Can't set maxTicketsBoughtByAddress to more than 100%");
+        if(_maxTicketsBoughtByAddress > 1 ether){
+            revert MaxTicketsBoughtByAddressTooHigh();
+        }
 
         emit ChangeMaxTicketsBoughtByAddress(maxTicketsBoughtByAddress, _maxTicketsBoughtByAddress);
         maxTicketsBoughtByAddress = _maxTicketsBoughtByAddress;
@@ -649,7 +783,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: This function can only be called by owner.
      */
     function changeFee(uint256 _fee) external onlyOwner {
-        require(_fee <= 0.4 ether, "eesee: Can't set fees to more than 40%");
+        if(_fee > 0.5 ether){
+            revert FeeTooHigh();
+        }
 
         emit ChangeFee(fee, _fee);
         fee = _fee;

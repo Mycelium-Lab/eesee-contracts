@@ -10,6 +10,7 @@ contract eeseeMinter {
     ///@dev The collection contract NFTs are minted to to save gas.
     eeseeNFT public publicCollection;
 
+    error IncorrectTokenURILength();
     constructor(string memory baseURI, string memory contractURI) {
         publicCollection = new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI, contractURI);
     }
@@ -25,7 +26,10 @@ contract eeseeMinter {
      * @return tokenIDs - IDs of tokens minted.
      */
     function mintToPublicCollection(uint256 amount, string[] memory tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns(address collection, uint256[] memory tokenIDs){
-        require(tokenURIs.length == amount, "eesee: tokenURIs must have a length of amount");
+        if(tokenURIs.length != amount){
+            revert IncorrectTokenURILength();
+        }
+
         uint256 startTokenId = publicCollection.nextTokenId();
         publicCollection.mint(msg.sender, amount);
 
