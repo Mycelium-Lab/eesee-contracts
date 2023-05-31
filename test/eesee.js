@@ -27,6 +27,7 @@ const {
         [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, acc9, feeCollector, royaltyCollector] = await ethers.getSigners()
         ticketBuyers = [acc2,acc3, acc4, acc5, acc6,  acc7]
         const _ESE = await hre.ethers.getContractFactory("ESE");
+        const _MockERC20 = await hre.ethers.getContractFactory("MockERC20");
         const _mockVRF = await hre.ethers.getContractFactory("MockVRFCoordinator");
         const _eesee = await hre.ethers.getContractFactory("eesee");
         const _NFT = await hre.ethers.getContractFactory("eeseeNFT");
@@ -55,7 +56,7 @@ const {
 
         await ESE.deployed()
 
-        ERC20 = await _ESE.deploy('2000000000000000000000000')
+        ERC20 = await _MockERC20.deploy('2000000000000000000000000')
         await ERC20.deployed()
 
         mockVRF = await _mockVRF.deploy()

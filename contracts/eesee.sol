@@ -5,9 +5,10 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/Ieesee.sol";
 
-contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
+contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     ///@dev An array of all existing listings.
     Listing[] public listings;
@@ -31,6 +32,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
     uint256 public fee = 0.10 ether;
     ///@dev Address {fee}s are sent to.
     address public feeCollector;
+    ///@dev Denominator for fee & maxTicketsBoughtByAddress variables.
+    uint256 private constant denominator = 1 ether;
 
     ///@dev Chainlink token.
     LinkTokenInterface immutable public LINK;
@@ -275,7 +278,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @return tokensSpent - Tokens spent.
      * @return ticketsBought - Tickets bought.
      */
-    function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external payable returns(uint256 tokensSpent, uint256 ticketsBought){
+    function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external nonReentrant payable returns(uint256 tokensSpent, uint256 ticketsBought){
         (address executor,IAggregationRouterV5.SwapDescription memory desc, bytes memory permit, bytes memory data) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes, bytes));
         if(
             bytes4(swapData[:4]) != IAggregationRouterV5.swap.selector || 
@@ -610,7 +613,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
         //Allow buy single tickets even if bought amount is more than maxTicketsBoughtByAddress
         if(listing.ticketsBoughtByAddress[msg.sender] > 1){
-            if(listing.ticketsBoughtByAddress[msg.sender] * 1 ether / listing.maxTickets > maxTicketsBoughtByAddress) revert MaxTicketsBoughtByAddress(msg.sender);
+            if(listing.ticketsBoughtByAddress[msg.sender] * denominator / listing.maxTickets > maxTicketsBoughtByAddress) revert MaxTicketsBoughtByAddress(msg.sender);
         }
         if(listing.ticketsBought > listing.maxTickets) revert AllTicketsBought();
 
@@ -635,7 +638,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
 
     function _collectFee(uint256 amount, uint256 _fee) internal returns(uint256 feeAmount){
         if(feeCollector == address(0)) return 0;
-        feeAmount = amount * _fee / 1 ether;
+        feeAmount = amount * _fee / denominator;
         if(feeAmount > 0){
             ESE.safeTransfer(feeCollector, feeAmount);
             emit CollectFee(feeCollector, feeAmount);
@@ -688,7 +691,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: This function can only be called by owner.
      */
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external onlyOwner {
-        if(_maxTicketsBoughtByAddress > 1 ether) revert MaxTicketsBoughtByAddressTooHigh();
+        if(_maxTicketsBoughtByAddress > denominator) revert MaxTicketsBoughtByAddressTooHigh();
 
         emit ChangeMaxTicketsBoughtByAddress(maxTicketsBoughtByAddress, _maxTicketsBoughtByAddress);
         maxTicketsBoughtByAddress = _maxTicketsBoughtByAddress;
@@ -700,7 +703,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * Note: This function can only be called by owner.
      */
     function changeFee(uint256 _fee) external onlyOwner {
-        if(_fee > 0.5 ether) revert FeeTooHigh();
+        if(_fee > denominator / 2) revert FeeTooHigh();
 
         emit ChangeFee(fee, _fee);
         fee = _fee;

@@ -10,9 +10,6 @@ contract eeseeMinter is IeeseeMinter {
     ///@dev The collection contract NFTs are minted to to save gas.
     IeeseeNFT public immutable publicCollection;
 
-    error IncorrectTokenURILength();
-
-    error IncorrectTokenURILength();
     constructor(string memory baseURI, string memory contractURI) {
         publicCollection = IeeseeNFT(new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI, contractURI));
     }

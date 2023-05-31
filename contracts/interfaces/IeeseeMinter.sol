@@ -7,6 +7,8 @@ import "../interfaces/IeeseeNFTDrop.sol";
 import "../interfaces/IeeseeNFT.sol";
 
 interface IeeseeMinter {
+    error IncorrectTokenURILength();
+
     function publicCollection() external view returns(IeeseeNFT);
     function mintToPublicCollection(uint256 amount, string[] memory tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns(IERC721 collection, uint256[] memory tokenIDs);
     function mintToPrivateCollection(
