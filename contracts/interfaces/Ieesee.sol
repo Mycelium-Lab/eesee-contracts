@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "./IeeseeMinter.sol";
@@ -267,7 +267,7 @@ interface Ieesee {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID);
+    ) external returns(uint256 ID, NFT memory token);
     function mintAndListItems(
         string[] memory tokenURIs, 
         uint256[] memory maxTickets, 
@@ -287,7 +287,7 @@ interface Ieesee {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID);
+    ) external returns(uint256 ID, NFT memory token);
     function mintAndListItemsWithDeploy(
         string memory name, 
         string memory symbol, 

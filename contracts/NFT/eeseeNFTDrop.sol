@@ -15,19 +15,11 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
     ///@dev Opensea royalty and NFT collection info
     string public contractURI;
     ///@dev Mint cap
-    uint256 public mintLimit;
+    uint256 public immutable mintLimit;
     ///@dev Current amount of minted nfts
     uint256 public mintedAmount;
     ///@dev Info about sale stages
     SaleStage[] public stages;
-
-    error MintTimestampNotInFuture();
-    error PresaleStageLimitExceeded();
-    error ZeroSaleStageDuration();
-    error MintLimitExceeded();
-    error MintingNotStarted();
-    error MintingEnded();
-    error NotInAllowlist();
 
     constructor(
         string memory name,

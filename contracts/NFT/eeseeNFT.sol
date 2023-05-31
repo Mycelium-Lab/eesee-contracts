@@ -6,17 +6,15 @@ import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "operator-filter-registry/src/DefaultOperatorFilterer.sol";
+import "../interfaces/IeeseeNFT.sol";
 
-contract eeseeNFT is ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
+contract eeseeNFT is IeeseeNFT, ERC721A, ERC2981, Ownable, DefaultOperatorFilterer {
     ///@dev tokenId => tokenURI.
     mapping(uint256 => string) private tokenURIs;
     ///@dev baseURI this contract uses,
     string public URI;
     ///@dev Opensea royalty and NFT collection info
     string public contractURI;
-
-    error SetURIForNonexistentToken();
-    error SetRoyaltyForNonexistentToken();
     
     constructor(
         string memory name,

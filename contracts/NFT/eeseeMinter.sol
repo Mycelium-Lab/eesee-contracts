@@ -6,13 +6,15 @@ import "./eeseeNFT.sol";
 import "./eeseeNFTDrop.sol";
 import "../interfaces/IeeseeMinter.sol";
 
-contract eeseeMinter {
+contract eeseeMinter is IeeseeMinter {
     ///@dev The collection contract NFTs are minted to to save gas.
-    eeseeNFT public publicCollection;
+    IeeseeNFT public immutable publicCollection;
+
+    error IncorrectTokenURILength();
 
     error IncorrectTokenURILength();
     constructor(string memory baseURI, string memory contractURI) {
-        publicCollection = new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI, contractURI);
+        publicCollection = IeeseeNFT(new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI, contractURI));
     }
 
     /**
@@ -25,9 +27,8 @@ contract eeseeMinter {
      * @return collection - Address of the collection the NFTs were minted to.
      * @return tokenIDs - IDs of tokens minted.
      */
-    function mintToPublicCollection(uint256 amount, string[] memory tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns(address collection, uint256[] memory tokenIDs){
+    function mintToPublicCollection(uint256 amount, string[] memory tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns(IERC721 collection, uint256[] memory tokenIDs){
         if(tokenURIs.length != amount) revert IncorrectTokenURILength();
-
         uint256 startTokenId = publicCollection.nextTokenId();
         publicCollection.mint(msg.sender, amount);
 
@@ -37,7 +38,7 @@ contract eeseeMinter {
             publicCollection.setURIForTokenId(tokenIDs[i], tokenURIs[i]);
             publicCollection.setRoyaltyForTokenId(tokenIDs[i], royaltyReceiver, royaltyFeeNumerator);
         }
-        collection = address(publicCollection);
+        collection = IERC721(address(publicCollection));
     }
 
     /**
@@ -61,7 +62,7 @@ contract eeseeMinter {
         string memory contractURI,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(address collection, uint256[] memory tokenIDs){
+    ) external returns(IERC721 collection, uint256[] memory tokenIDs){
         eeseeNFT privateCollection = new eeseeNFT(name, symbol, baseURI, contractURI);
         privateCollection.setDefaultRoyalty(royaltyReceiver, royaltyFeeNumerator);
 
@@ -73,7 +74,7 @@ contract eeseeMinter {
         for(uint256 i; i < amount; i++){
             tokenIDs[i] = i + startTokenId;
         }
-        collection = address(privateCollection);
+        collection = IERC721(address(privateCollection));
     }
 
     /**
@@ -102,7 +103,7 @@ contract eeseeMinter {
         uint256 mintStartTimestamp, 
         IeeseeNFTDrop.StageOptions memory publicStageOptions,
         IeeseeNFTDrop.StageOptions[] memory presalesOptions
-    ) external returns(address collection){
+    ) external returns(IERC721 collection){
         eeseeNFTDrop dropCollection = new eeseeNFTDrop(
             name,
             symbol,
@@ -116,6 +117,6 @@ contract eeseeMinter {
             presalesOptions
         );
         dropCollection.transferOwnership(msg.sender);
-        collection = address(dropCollection);
+        collection = IERC721(address(dropCollection));
     }
 }
