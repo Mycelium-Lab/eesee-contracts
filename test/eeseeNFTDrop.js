@@ -133,7 +133,8 @@ const {
             zeroAddress,//ChainLink token
             '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
             0,//minimumRequestConfirmations
-            50000//callbackGasLimit
+            50000,//callbackGasLimit
+            '0x0000000000000000000000000000000000000000'//1inch, does not matter in this test
         )
         await eesee.deployed()
         currentTimestamp = (await ethers.provider.getBlock()).timestamp;

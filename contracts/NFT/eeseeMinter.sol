@@ -12,6 +12,7 @@ contract eeseeMinter is IeeseeMinter {
 
     error IncorrectTokenURILength();
 
+    error IncorrectTokenURILength();
     constructor(string memory baseURI, string memory contractURI) {
         publicCollection = IeeseeNFT(new eeseeNFT("ESE Public Collection", "ESE-Public", baseURI, contractURI));
     }

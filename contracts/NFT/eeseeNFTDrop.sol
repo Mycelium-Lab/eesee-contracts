@@ -62,7 +62,7 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
      */
     function getSaleStage() public view returns (uint8 index) {
         for(uint8 i = 0; i < stages.length; i ++) {
-            if (block.timestamp >= stages[i].startTimestamp && (block.timestamp <= stages[i].endTimestamp || stages[i].endTimestamp == 0)) {
+            if (block.timestamp >= stages[i].startTimestamp && (block.timestamp <= stages[i].endTimestamp || stages[i].endTimestamp == 0)){
                 return i;
             }
         }
@@ -89,23 +89,16 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
      * Note: This function can only be called by owner.
      */
     function mint(address recipient, uint256 quantity, bytes32[] memory merkleProof) external onlyOwner {
-        if(block.timestamp < stages[0].startTimestamp){
-            revert MintingNotStarted();
-        }
-        if(block.timestamp > stages[stages.length - 1].endTimestamp && stages[stages.length - 1].endTimestamp != 0){
-            revert MintingEnded();
-        }
+        if(block.timestamp < stages[0].startTimestamp) revert MintingNotStarted();
+        if(block.timestamp > stages[stages.length - 1].endTimestamp && stages[stages.length - 1].endTimestamp != 0) revert MintingEnded();
+        
         uint8 saleStageIndex = getSaleStage();
 
-        if(!verifyCanMint(saleStageIndex, recipient, merkleProof) && stages[saleStageIndex].stageOptions.allowListMerkleRoot != bytes32(0)){
+        if(!verifyCanMint(saleStageIndex, recipient, merkleProof) && stages[saleStageIndex].stageOptions.allowListMerkleRoot != bytes32(0)) 
             revert NotInAllowlist();
-        }
-        if(quantity + stages[saleStageIndex].addressMintedAmount[recipient] > stages[saleStageIndex].stageOptions.perAddressMintLimit && stages[saleStageIndex].stageOptions.perAddressMintLimit != 0){
+        if(quantity + stages[saleStageIndex].addressMintedAmount[recipient] > stages[saleStageIndex].stageOptions.perAddressMintLimit && stages[saleStageIndex].stageOptions.perAddressMintLimit != 0) 
             revert MintLimitExceeded();
-        }
-        if(mintedAmount + quantity > mintLimit && mintLimit != 0){
-            revert MintLimitExceeded();
-        }
+        if(mintedAmount + quantity > mintLimit && mintLimit != 0) revert MintLimitExceeded();
 
         _safeMint(recipient, quantity);
         stages[saleStageIndex].addressMintedAmount[recipient] += quantity;
@@ -123,18 +116,13 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
     }
 
     function _setMintStageOptions(uint256 mintStartTimestamp, StageOptions memory publicStageOptions, StageOptions[] memory presalesOptions) internal {
-        if(block.timestamp >= mintStartTimestamp){
-            revert MintTimestampNotInFuture();
-        }
-        if(presalesOptions.length > 5){
-            revert PresaleStageLimitExceeded();
-        }
+        if(block.timestamp >= mintStartTimestamp) revert MintTimestampNotInFuture();
+        if(presalesOptions.length > 5) revert PresaleStageLimitExceeded();
 
         uint256 timePassed = mintStartTimestamp;
         for(uint8 i = 0; i < presalesOptions.length; i ++) {
-            if(presalesOptions[i].duration == 0){
-                revert ZeroSaleStageDuration();
-            }
+            if(presalesOptions[i].duration == 0) revert ZeroSaleStageDuration();
+            
             SaleStage storage presale = stages.push();
             presale.startTimestamp = timePassed;
             timePassed += presalesOptions[i].duration;
@@ -147,7 +135,7 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
         publicStage.stageOptions = publicStageOptions;
         publicStage.stageOptions.allowListMerkleRoot = bytes32(0);
         publicStage.startTimestamp = timePassed;
-        if (publicStageOptions.duration != 0 ){
+        if (publicStageOptions.duration != 0){
             publicStage.endTimestamp = publicStage.startTimestamp + publicStageOptions.duration;
         }
     }

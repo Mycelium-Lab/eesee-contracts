@@ -9,19 +9,22 @@ const {
   const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
   describe("eesee", function () {
     let ESE;
+    let ERC20;
     let mockVRF;
     let eesee;
     let NFT;
-    let signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector;
+    let signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, acc9, feeCollector;
     let ticketBuyers;
     let minter;
     let royaltyEninge;
+    let mock1InchExecutor
+    let mock1InchRouter
     //after one year
     const zeroAddress = "0x0000000000000000000000000000000000000000"
     const oneAddress = "0x0000000000000000000000000000000000000001"
   
     this.beforeAll(async() => {
-        [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector, royaltyCollector] = await ethers.getSigners()
+        [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, acc9, feeCollector, royaltyCollector] = await ethers.getSigners()
         ticketBuyers = [acc2,acc3, acc4, acc5, acc6,  acc7]
         const _ESE = await hre.ethers.getContractFactory("ESE");
         const _mockVRF = await hre.ethers.getContractFactory("MockVRFCoordinator");
@@ -29,6 +32,8 @@ const {
         const _NFT = await hre.ethers.getContractFactory("eeseeNFT");
         const _minter = await hre.ethers.getContractFactory("eeseeMinter");
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
+        const _mock1InchExecutor = await hre.ethers.getContractFactory("Mock1InchExecutor");
+        const _mock1InchRouter = await hre.ethers.getContractFactory("Mock1InchRouter");
         const _privateSale = await hre.ethers.getContractFactory('ESECrowdsale')
 
         const mockPresale = await _privateSale.deploy(125000000000000, oneAddress, oneAddress, oneAddress, 1000000000, 200000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
@@ -38,7 +43,7 @@ const {
         await mockPrivateSale.deployed()
 
         ESE = await _ESE.deploy(
-            '1000000000000000000000000', 
+            '2000000000000000000000000', 
             '50000000000000000000000000', 
             mockPresale.address, 
             31536000, 
@@ -47,7 +52,11 @@ const {
             10, 
             5184000
         )
+
         await ESE.deployed()
+
+        ERC20 = await _ESE.deploy('2000000000000000000000000')
+        await ERC20.deployed()
 
         mockVRF = await _mockVRF.deploy()
         await mockVRF.deployed()
@@ -58,6 +67,14 @@ const {
         royaltyEninge = await _royaltyEngine.deploy();
         await royaltyEninge.deployed()
 
+        mock1InchExecutor = await _mock1InchExecutor.deploy(ESE.address, ERC20.address);
+        await mock1InchExecutor.deployed()
+        await ESE.transfer(mock1InchExecutor.address, '1000000000000000000000000')
+        await ERC20.transfer(mock1InchExecutor.address, '1000000000000000000000000')
+
+        mock1InchRouter = await _mock1InchRouter.deploy();
+        await mock1InchRouter.deployed()
+
         eesee = await _eesee.deploy(
             ESE.address, 
             minter.address, 
@@ -67,7 +84,8 @@ const {
             zeroAddress,//ChainLink token
             '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
             0,//minimumRequestConfirmations
-            50000//callbackGasLimit
+            50000,//callbackGasLimit
+            mock1InchRouter.address
         )
         await eesee.deployed()
         NFT = await _NFT.deploy("TEST", "TST", '', '')
@@ -88,10 +106,10 @@ const {
     })
 
     it('Lists NFT', async () => {
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 1, 2, 86400)).to.be.revertedWith("eesee: Max tickets must be more or equal 2")
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86400)).to.be.revertedWith('eesee: Ticket price must be above zero')
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86399)).to.be.revertedWith('eesee: Duration must be more or equal minDuration')
-        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 2592001)).to.be.revertedWith('eesee: Duration must be less or equal maxDuration')
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 1, 2, 86400)).to.be.revertedWithCustomError(eesee, "MaxTicketsTooLow")
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86400)).to.be.revertedWithCustomError(eesee, "TicketPriceTooLow")
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 86399)).to.be.revertedWithCustomError(eesee, "DurationTooLow").withArgs(86400)
+        await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 0, 2592001)).to.be.revertedWithCustomError(eesee, "DurationTooHigh").withArgs(2592000)
         
         const ID = 1
         await expect(eesee.connect(signer).listItem({collection: NFT.address, tokenID: 1}, 100, 2, 86400))
@@ -207,9 +225,9 @@ const {
 
     it('Buys tickets', async () => {
         const ID = 1
-        await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWith("eesee: Amount must be above zero")
-        await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWith('eesee: Listing does not exist')
-        await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWith('eesee: Max tickets bought by this address')
+        await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWithCustomError(eesee, "BuyAmountTooLow")
+        await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWithCustomError(eesee, "ListingNotExists").withArgs(0);
+        await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address);
 
         const balanceBefore = await ESE.balanceOf(acc2.address)
         const recipt = expect(eesee.connect(acc2).buyTickets(ID, 20))
@@ -226,7 +244,7 @@ const {
         const balanceAfter = await ESE.balanceOf(acc2.address)
         assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
 
-        await expect(eesee.connect(acc2).buyTickets(ID, 1)).to.be.revertedWith("eesee: Max tickets bought by this address")
+        await expect(eesee.connect(acc2).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address)
 
         const listing = await eesee.listings(ID);
         assert.equal(listing.ticketsBought, 20, "ticketsBought is correct")
@@ -250,20 +268,20 @@ const {
             const balanceAfter = await ESE.balanceOf(ticketBuyers[i].address)
             assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
 
-            await expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 1)).to.be.revertedWith("eesee: Max tickets bought by this address")
+            await expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(ticketBuyers[i].address)
 
             const listing = await eesee.listings(ID);
             assert.equal(listing.ticketsBought, (i + 1)*20, "ticketsBought is correct")
 
             await expect(eesee.connect(ticketBuyers[i]).batchReceiveItems([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Caller is not the winner")
+                .to.be.revertedWithCustomError(eesee, "CallerNotWinner").withArgs(ID)
             await expect(eesee.connect(ticketBuyers[i]).batchReceiveTokens([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Listing is not filfilled")
+                .to.be.revertedWithCustomError(eesee, "ListingNotFulfilled").withArgs(ID)
 
             await expect(eesee.connect(signer).batchReclaimItems([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Listing has not expired yet")
+                .to.be.revertedWithCustomError(eesee, "ListingNotExpired").withArgs(ID)
             await expect(eesee.connect(ticketBuyers[i]).batchReclaimTokens([ID], ticketBuyers[i].address))
-                .to.be.revertedWith("eesee: Listing has not expired yet")
+                .to.be.revertedWithCustomError(eesee, "ListingNotExpired").withArgs(ID)
 
             if(i == 4){
                 //MockVRF's first requestID is 0
@@ -278,7 +296,7 @@ const {
             await buyTicketsForExpiredReceipt.to.emit(eesee, "BuyTicket").withArgs(expiredListingID, acc7.address, i, 3)
         }
         
-        await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1)).to.be.revertedWith("eesee: All tickets bought")
+        await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "AllTicketsBought")
     })
 
     it('Selects winner', async () => {
@@ -299,7 +317,7 @@ const {
         const winnerAcc = signers.filter(signer => signer.address === listing.winner)[0]
         const notWinnerAcc = signers.filter(signer => signer.address !== listing.winner)[0]
         await expect(eesee.connect(notWinnerAcc).batchReceiveItems([ID], listing.winner))
-        .to.be.revertedWith("eesee: Caller is not the winner")
+        .to.be.revertedWithCustomError(eesee, "CallerNotWinner").withArgs(ID)
         await expect(eesee.connect(winnerAcc).batchReceiveItems([ID], listing.winner))
         .to.emit(eesee, "ReceiveItem")
         .withArgs(ID, anyValue, listing.winner)
@@ -309,12 +327,12 @@ const {
         const owner = await NFT.ownerOf(ID)
         assert.equal(owner, listing.winner, "new owner of NFT is correct")
         await expect(eesee.connect(winnerAcc).batchReceiveItems([ID], listing.winner))
-        .to.be.revertedWith("eesee: Item has already been claimed")
+        .to.be.revertedWithCustomError(eesee, "ItemAlreadyClaimed").withArgs(ID)
     })
     it('Receives tokens',  async () => {
         const ID = 1
         await expect(eesee.connect(acc2).batchReceiveTokens([ID], acc2.address))
-        .to.be.revertedWith("eesee: Caller is not the owner")
+        .to.be.revertedWithCustomError(eesee, "CallerNotOwner").withArgs(ID)
 
         const listing = await eesee.listings(ID);
         const expectedFee = BigInt(listing.ticketPrice) * BigInt(listing.maxTickets) * BigInt(listing.fee) / BigInt('1000000000000000000')
@@ -335,7 +353,7 @@ const {
 
         // reverted with eesee: Listing is not filfilled because listing deleted after previous claim
         await expect(eesee.connect(signer).batchReceiveTokens([ID], signer.address))
-        .to.be.revertedWith("eesee: Listing is not filfilled")
+        .to.be.revertedWithCustomError(eesee, "ListingNotFulfilled").withArgs(ID)
     })
     it('buyTickets reverts if listing is expired', async () => {
         const IDs = [2,3,4]
@@ -348,8 +366,8 @@ const {
         const listing = await eesee.listings(IDs[0])
         assert.equal(timestampBeforeTimeSkip, timestampAfterTimeSkip-86401, "timetravel is successfull")
         assert.equal((listing.creationTime.add(listing.duration)).lt(timestampAfterTimeSkip), true, "listing expired")
-        await expect(eesee.connect(acc2).buyTickets(IDs[0], 20)).to.be.revertedWith("eesee: Listing has already expired")
-        await expect(eesee.connect(acc2).buyTickets(IDs[1], 20)).to.be.revertedWith("eesee: Listing has already expired")
+        await expect(eesee.connect(acc2).buyTickets(IDs[0], 20)).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[0])
+        await expect(eesee.connect(acc2).buyTickets(IDs[1], 20)).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[1])
     })
     it('Can reclaim tokens if listing is expired', async () => {
         const expiredListingID = 2
@@ -361,7 +379,7 @@ const {
     it('Can reclaim item if listing is expired', async () => {
         const IDs = [2,3,4]
         await expect(eesee.connect(acc2).batchReclaimItems(IDs, signer.address))
-        .to.be.revertedWith("eesee: Caller is not the owner")
+        .to.be.revertedWithCustomError(eesee, "CallerNotOwner").withArgs(2)
         await expect(eesee.connect(signer).batchReclaimItems(IDs, signer.address))
         .to.emit(eesee, "ReclaimItem")
         .withArgs(2, anyValue, signer.address)
@@ -371,7 +389,7 @@ const {
         .withArgs(4, anyValue, signer.address)
 
         await expect(eesee.connect(signer).batchReclaimItems([4], signer.address))
-            .to.be.revertedWith("eesee: Item has already been claimed")
+            .to.be.revertedWithCustomError(eesee, "ItemAlreadyClaimed").withArgs(4)
     })
     it('Royalties work for public collections', async () => {
         const currentListingID = (await eesee.getListingsLength()).toNumber()
@@ -509,6 +527,186 @@ const {
         let royaltyCollectorBalanceAfter = await ESE.balanceOf(royaltyCollector.address)
         assert.equal(royaltyCollectorBalanceBefore.add(royaltyInfoForListing1[1]).toString(), royaltyCollectorBalanceAfter.toString(), 'Royalty collector balance is correct')
     })
+
+    it('swaps tokens using 1inch', async () => {
+        const currentListingID = (await eesee.getListingsLength()).toNumber()
+        await eesee.connect(signer).mintAndListItem(
+            'contract/',
+            10,
+            50,
+            86400,
+            royaltyCollector.address,
+            300
+        )
+
+        await ERC20.approve(eesee.address, '232')
+
+        let iface = new ethers.utils.Interface([
+            'function swap(address executor, tuple(address srcToken, address dstToken, address srcReceiver, address dstReceiver, uint amount, uint minReturnAmount, uint flags) desc, bytes permit, bytes data)',
+            'function swep(address executor, tuple(address srcToken, address dstToken, address srcReceiver, address dstReceiver, uint amount, uint minReturnAmount, uint flags) desc, bytes permit, bytes data)'
+        ]);
+        
+        let swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ESE.address,//
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232, 
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ERC20.address,//
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address,
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: ERC20.address, //
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
+
+        swapData = iface.encodeFunctionData('swep', [//
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232,
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 1}))//
+        .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: ERC20.address,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 232, //should buy 2 tickets + 10 ESE dust + (10-1) ERC20 dust 
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+
+        const balanceBefore = await ESE.balanceOf(signer.address)
+        const balanceBefore_ = await ERC20.balanceOf(signer.address)
+
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 0, 50)
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 1, 50)
+
+        const balanceAfter = await ESE.balanceOf(signer.address)
+        const balanceAfter_ = await ERC20.balanceOf(signer.address)
+
+        assert.equal(balanceAfter.sub(balanceBefore).toString(), "10", 'ESE balance is correct')
+        assert.equal(balanceBefore_.sub(balanceAfter_).toString(), "223", 'ERC20 balance is correct')
+
+        swapData = iface.encodeFunctionData('swap', [
+            mock1InchExecutor.address, 
+            {
+                srcToken: zeroAddress,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 212, //should buy 2 tickets + 10 ESE dust + (10-1) ERC20 dust 
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 211}))//
+        .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
+
+        swapData = iface.encodeFunctionData('swap', [//TODO:check eth transfer
+            mock1InchExecutor.address, 
+            {
+                srcToken: zeroAddress,
+                dstToken: ESE.address,
+                srcReceiver: mock1InchExecutor.address,
+                dstReceiver: eesee.address, 
+                amount: 64, //should buy 2 tickets + 8 ESE dust + (10-1) ETH dust
+                minReturnAmount: 100,
+                flags: 0,
+            }, 
+            '0x00',
+            '0x00'
+        ])
+
+        const _balanceBefore = await ESE.balanceOf(acc9.address)
+        const _balanceBefore_ = await ethers.provider.getBalance(acc9.address);
+
+        const tx = await eesee.connect(acc9).buyTicketsWithSwap(currentListingID, swapData, {value: 64})
+        const rr = await tx.wait()
+        await expect(tx)
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, acc9.address, 2, 50)
+            .to.emit(eesee, "BuyTicket").withArgs(currentListingID, acc9.address, 3, 50)
+
+        const _balanceAfter = await ESE.balanceOf(acc9.address)
+        const _balanceAfter_ = await ethers.provider.getBalance(acc9.address);
+
+        assert.equal(_balanceAfter.sub(_balanceBefore).toString(), "8", 'ESE balance is correct')
+        assert.equal(_balanceBefore_.sub(_balanceAfter_).sub(rr.gasUsed.mul(rr.effectiveGasPrice)).toString(), "55", 'ERC20 balance is correct')
+    })
+
     it('Changes constants', async () => {
         let newValue = 1
         const minDuration = await eesee.minDuration() 
@@ -527,7 +725,7 @@ const {
 
         const maxTicketsBoughtByAddress = await eesee.maxTicketsBoughtByAddress() 
         await expect(eesee.connect(acc2).changeMaxTicketsBoughtByAddress(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
-        await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress('1000000000000000001')).to.be.revertedWith("eesee: Can't set maxTicketsBoughtByAddress to more than 100%")
+        await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress('1000000000000000001')).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddressTooHigh")
         await expect(eesee.connect(signer).changeMaxTicketsBoughtByAddress(newValue))
         .to.emit(eesee, "ChangeMaxTicketsBoughtByAddress")
         .withArgs(maxTicketsBoughtByAddress, newValue)
@@ -535,7 +733,7 @@ const {
 
         const fee = await eesee.fee() 
         await expect(eesee.connect(acc2).changeFee(newValue)).to.be.revertedWith("Ownable: caller is not the owner")
-        await expect(eesee.connect(signer).changeFee('400000000000000001')).to.be.revertedWith("eesee: Can't set fees to more than 40%")
+        await expect(eesee.connect(signer).changeFee('500000000000000001')).to.be.revertedWithCustomError(eesee, "FeeTooHigh")
         await expect(eesee.connect(signer).changeFee(newValue))
         .to.emit(eesee, "ChangeFee")
         .withArgs(fee, newValue)

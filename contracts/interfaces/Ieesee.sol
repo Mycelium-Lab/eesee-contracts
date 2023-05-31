@@ -6,6 +6,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "./IeeseeMinter.sol";
 import "./IRoyaltyEngineV1.sol";
+import "./IAggregationRouterV5.sol";
 
 interface Ieesee {
     /**
@@ -171,6 +172,41 @@ interface Ieesee {
         uint256 mintFee
     );
 
+    error CallerNotOwner(uint256 ID);
+    error CallerNotWinner(uint256 ID);
+
+    error ItemAlreadyClaimed(uint256 ID);
+    error TokensAlreadyClaimed(uint256 ID);
+
+    error ListingAlreadyFulfilled(uint256 ID);
+    error ListingNotFulfilled(uint256 ID);
+    error ListingExpired(uint256 ID);
+    error ListingNotExpired(uint256 ID);
+    error ListingNotExists(uint256 ID);
+
+    error DurationTooLow(uint256 minDuration);
+    error DurationTooHigh(uint256 maxDuration);
+    error MaxTicketsTooLow();
+    error TicketPriceTooLow();
+    error BuyAmountTooLow();
+    error FeeTooHigh();
+    error MaxTicketsBoughtByAddressTooHigh();
+
+    error AllTicketsBought();
+    error NoTicketsBought(uint256 ID);
+    error MaxTicketsBoughtByAddress(address _address);
+
+    error InvalidArrayLengths();
+    error InvalidSwapDescription();
+    error InvalidMsgValue();
+    error InvalidEarningsCollector();
+    error InvalidQuantity();
+    error InvalidRecipient();
+
+    error SwapNotSuccessful();
+    error TransferNotSuccessful();
+    error EthDepositRejected();
+
     function listings(uint256) external view returns(
         uint256 ID,
         NFT memory nft,
@@ -207,6 +243,9 @@ interface Ieesee {
     function subscriptionID() external view returns(uint64);
     function keyHash() external view returns(bytes32);
     function minimumRequestConfirmations() external view returns(uint16);
+
+    function royaltyEngine() external view returns(IRoyaltyEngineV1);
+    function OneInchRouter() external view returns(address);
 
     function listItem(
         NFT memory nft, 
@@ -262,6 +301,7 @@ interface Ieesee {
     ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs);
 
     function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent);
+    function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external payable returns(uint256 tokensSpent, uint256 ticketsBought);
 
     function listDrop(
         string memory name,
