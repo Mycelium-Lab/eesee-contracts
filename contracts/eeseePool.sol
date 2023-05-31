@@ -21,7 +21,7 @@ contract eeseePool is Ownable{
     }
 
     ///@dev ESE token this contract uses.
-    IERC20 public rewardToken;
+    IERC20 public immutable rewardToken;
     ///@dev Current reward ID.
     uint256 public rewardID;
     ///@dev Maps {rewardID} to its merkle root.

@@ -2,234 +2,122 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "./Crowdsales/Crowdsale/WhitelistTimedCrowdsale.sol";
+import "./interfaces/IESECrowdsale.sol";
 
-contract ESE is ERC20, Ownable {
-    struct LockedTokens {
-        uint256 amount;
-        uint256 unlockTimestamp;
-    }
-    mapping(address => LockedTokens[]) public lockedUserTokens;
-    mapping(address => uint256) public presaleLiquidityLockedTokens;
-    mapping(address => uint256) public presalePrivateLockedTokens;
-    mapping(address => uint256) public lockedTokensAmount;
+contract ESE is ERC20 {
+    ///@dev Presale contract.
+    IESECrowdsale public immutable presale;
+    ///@dev Presale start timestamp.
+    uint256 public immutable presaleStart;
+    ///@dev Time in which tokens will be unlocked.
+    uint256 public immutable presaleUnlockTime;
 
-    address[] public crowdsales;
-    WhitelistTimedCrowdsale public privateCrowdsale;
-    bool public areCrowdsalesSet;
-    uint256 public presaleLiquidityUnlockTimestamp;
-    bool public isPresaleLiquidityUnlocked;
 
-    event SetCrowdsales(address[] crowdsales, address privateCrowdsale);
-    event LockTokens(
-        address recipient,
-        uint256 amount,
-        uint256 unlockTimestamp
-    );
-    event LockPresaleLiquidityTokens(address recipient, uint256 amount);
-    event LockPresalePrivateTokens(address recipient, uint256 amount);
-    event PresaleLiquidityTokensUnlock(uint256 timestamp);
+    ///@dev Private sale contract.
+    IESECrowdsale public immutable privateSale;
+    ///@dev Presale start timestamp.
+    uint256 public immutable privateSaleStart;
+    ///@dev Periods over which tokens will be unlocked.
+    uint256 public immutable privateSalePeriods;
+    ///@dev Duration of each period.
+    uint256 public immutable privateSalePeriodTime;
 
-    constructor(uint256 amount) ERC20("eesee", "ESE") {
-        //TODO: premint + vesting + IDO - нужно обсуждение с заказчиком
+    ///@dev Tokens locked by crowdsale contract for an address.
+    mapping(address => uint256) private presaleTokens;
+    mapping(address => uint256) private privateSaleTokens;
+
+    ///@dev False if ignore lock mechanism on private sales
+    bool public immutable lockPrivateSale;
+
+    error InvalidAmount();
+    error InvalidCrowdsale();
+    error TransferingLockedTokens(uint256 tokensLocked);
+
+    constructor(
+        uint256 amount, 
+        
+        uint256 _presaleAmount, // 50000000 ESE
+        IESECrowdsale _presale, 
+        uint256 _presaleUnlockTime,//365 days
+
+        uint256 _privateSaleAmount, // 90000000 ESE
+        IESECrowdsale _privateSale,
+        uint256 _privateSalePeriods,//10
+        uint256 _privateSalePeriodTime//60 days
+    ) ERC20("eesee", "ESE") {
+        if (amount == 0 || _presaleAmount == 0 || _privateSaleAmount == 0) revert InvalidAmount();
+        if (address(_presale) == address(0) || address(_privateSale) == address(0)) revert InvalidCrowdsale();
+
+        presale = _presale;
+        presaleStart = _presale.openingTime();
+        presaleUnlockTime = _presaleUnlockTime;
+
+        privateSale = _privateSale;
+        privateSaleStart = _privateSale.openingTime();
+        privateSalePeriods = _privateSalePeriods;
+        privateSalePeriodTime = _privateSalePeriodTime;
+        lockPrivateSale = _privateSalePeriods != 0 && _privateSalePeriodTime != 0;
+        
+        //TODO: IDO
+        //TODO: liquidity
+        //TODO: DAO
+        //TODO: marketing
+        //TODO: airdrop
+        //TODO: dev team
+
         //TODO: remove this
         _mint(msg.sender, amount);
+
+        _mint(address(_presale), _presaleAmount);
+        _mint(address(_privateSale), _privateSaleAmount);
     }
 
-    modifier onlyCrowdsale() {
-        bool isMsgSenderCrowdsale = false;
-        for (uint i = 0; i < crowdsales.length; i++) {
-            if (msg.sender == crowdsales[i]) {
-                isMsgSenderCrowdsale = true;
+    /**
+     * @dev Returns locked tokens for an {_address}.
+     * @param _address - Address to check.
+     
+     * @return uint256 - Amount of tokens locked.
+     */
+    function lockedAmount(address _address) external view returns (uint256) {
+        return _lockedAmount(_address);
+    }
+
+    /**
+     * @dev Returns tokens available for an {_address} to transfer.
+     * @param _address - Address to check.
+     
+     * @return uint256 - Amount of tokens available.
+     */
+    function available(address _address) external view returns (uint256) {
+        return balanceOf(_address) - _lockedAmount(_address);
+    }
+
+    function _lockedAmount(address _address) private view returns (uint256 amount) {
+        if(presaleTokens[_address] != 0 && block.timestamp - presaleStart < presaleUnlockTime){
+            amount = presaleTokens[_address] / 2;
+        }
+
+        if(lockPrivateSale && privateSaleTokens[_address] != 0){
+            uint256 privateSalePeriodsPassed = (block.timestamp - privateSaleStart) / privateSalePeriodTime;
+            if(privateSalePeriodsPassed > privateSalePeriods){
+                return amount;
             }
-        }
-        require(
-            isMsgSenderCrowdsale || msg.sender == address(privateCrowdsale),
-            "ESE: only crowdsale contracts can lock tokens"
-        );
-        _;
-    }
-
-    function getTokensAvailableForUnlock(
-        address user
-    ) public view returns (uint256 totalAvailable) {
-        for (uint i = 0; i < lockedUserTokens[user].length; i++) {
-            if (lockedUserTokens[user][i].unlockTimestamp <= block.timestamp) {
-                totalAvailable += lockedUserTokens[user][i].amount;
-            }
-        }
-        if (privateCrowdsale.hasClosed()) {
-            totalAvailable += presalePrivateLockedTokens[user];
-        }
-        if (
-            isPresaleLiquidityUnlocked &&
-            block.timestamp >= presaleLiquidityUnlockTimestamp
-        ) {
-            totalAvailable += presaleLiquidityLockedTokens[user];
+            amount += privateSaleTokens[_address] * (privateSalePeriods - privateSalePeriodsPassed) / privateSalePeriods;
         }
     }
 
-    function getTotalLockedTokensAmount(
-        address user
-    ) public view returns (uint256) {
-        return
-            lockedTokensAmount[user] +
-            presaleLiquidityLockedTokens[user] +
-            presalePrivateLockedTokens[user];
-    }
-
-    function getLockedUserTokensLength(
-        address user
-    ) public view returns (uint256) {
-        return lockedUserTokens[user].length;
-    }
-
-    function getLockedUserTokens(
-        address user,
-        uint256 index
-    ) public view returns (LockedTokens memory) {
-        return lockedUserTokens[user][index];
-    }
-
-    function setCrowdsales(
-        address[] memory _crowdsales,
-        address _privateCrowdsale
-    ) public onlyOwner {
-        require(!areCrowdsalesSet, "ESE: crowdsales have already been set");
-        crowdsales = _crowdsales;
-        privateCrowdsale = WhitelistTimedCrowdsale(_privateCrowdsale);
-        areCrowdsalesSet = true;
-        emit SetCrowdsales(crowdsales, _privateCrowdsale);
-    }
-
-    function unlockPresaleLiquidityTokens() public onlyOwner {
-        require(
-            !isPresaleLiquidityUnlocked,
-            "ESE: you have already unlocked tokens after liquidity had been added"
-        );
-        presaleLiquidityUnlockTimestamp = block.timestamp + 180 * 86400;
-        isPresaleLiquidityUnlocked = true;
-        emit PresaleLiquidityTokensUnlock(presaleLiquidityUnlockTimestamp);
-    }
-
-    function lockTokens(
-        address recipient,
-        uint256 amount,
-        uint256 unlockTimestamp
-    ) public onlyCrowdsale {
-        require(
-            amount <= balanceOf(recipient) - getTotalLockedTokensAmount(recipient),
-            "ESE: unlocked tokens balance of recipient has to be lower or equal than amount"
-        );
-        require(
-            block.timestamp < unlockTimestamp,
-            "ESE: unlock time must be in the future"
-        );
-        LockedTokens storage lockedTokens = lockedUserTokens[recipient].push();
-        lockedTokens.amount = amount;
-        lockedTokens.unlockTimestamp = unlockTimestamp;
-        lockedTokensAmount[recipient] += amount;
-        emit LockTokens(recipient, amount, unlockTimestamp);
-    }
-
-    function lockPresaleLiquidityTokens(
-        address recipient,
-        uint256 amount
-    ) public onlyCrowdsale {
-        require(
-            amount <= balanceOf(recipient) - getTotalLockedTokensAmount(recipient),
-            "ESE: unlocked tokens balance of recipient has to be lower or equal than amount"
-        );
-        presaleLiquidityLockedTokens[recipient] += amount;
-        emit LockPresaleLiquidityTokens(recipient, amount);
-    }
-
-    function lockPresalePrivateTokens(
-        address recipient,
-        uint256 amount
-    ) public onlyCrowdsale {
-        require(
-            amount <= balanceOf(recipient) - getTotalLockedTokensAmount(recipient),
-            "ESE: unlocked tokens balance of recipient has to be lower or equal than amount"
-        );
-        presalePrivateLockedTokens[recipient] += amount;
-        emit LockPresalePrivateTokens(recipient, amount);
-    }
-
-    function transfer(
-        address to,
-        uint256 amount
-    ) public override returns (bool) {
-        if (lockedTokensAmount[msg.sender] == 0) {
-            return super.transfer(to, amount);
-        }
-        require(
-            balanceOf(msg.sender) >= amount,
-            "ERC20: transfer amount exceeds balance"
-        );
-        _unlockTokens(msg.sender);
-        if (
-            isPresaleLiquidityUnlocked &&
-            block.timestamp >= presaleLiquidityUnlockTimestamp
-        ) {
-            presaleLiquidityLockedTokens[msg.sender] = 0;
-        }
-        if (privateCrowdsale.hasClosed()) {
-            presalePrivateLockedTokens[msg.sender] = 0;
-        }
-        uint256 totalLockedTokensAmount = getTotalLockedTokensAmount(
-            msg.sender
-        );
-        require(
-            balanceOf(msg.sender) - totalLockedTokensAmount >= amount,
-            "ESE: not enough unlocked tokens"
-        );
-        return super.transfer(to, amount);
-    }
-
-    function transferFrom(
+    function _beforeTokenTransfer(
         address from,
         address to,
         uint256 amount
-    ) public override returns (bool) {
-        if (lockedTokensAmount[from] == 0) {
-            return super.transferFrom(from, to, amount);
-        }
-        require(
-            balanceOf(from) >= amount,
-            "ERC20: transfer amount exceeds balance"
-        );
-        _unlockTokens(from);
-        if (
-            isPresaleLiquidityUnlocked &&
-            block.timestamp >= presaleLiquidityUnlockTimestamp
-        ) {
-            presaleLiquidityLockedTokens[from] = 0;
-        }
-        if (privateCrowdsale.hasClosed()) {
-            presalePrivateLockedTokens[from] = 0;
-        }
-        uint256 totalLockedTokensAmount = getTotalLockedTokensAmount(from);
-        require(
-            balanceOf(from) - totalLockedTokensAmount >= amount,
-            "ESE: not enough unlocked tokens"
-        );
-        return super.transferFrom(from, to, amount);
-    }
-
-    function _unlockTokens(address from) internal {
-        uint i = 0;
-        while (i < lockedUserTokens[from].length) {
-            if (lockedUserTokens[from][i].unlockTimestamp <= block.timestamp) {
-                lockedTokensAmount[from] -= lockedUserTokens[from][i].amount;
-                lockedUserTokens[from][i] = lockedUserTokens[from][
-                    lockedUserTokens[from].length - 1
-                ];
-                lockedUserTokens[from].pop();
-            } else {
-                i++;
-            }
+    ) internal virtual override {
+        super._beforeTokenTransfer(from, to, amount);
+        if(from == address(presale)){
+            presaleTokens[to] += amount;
+        } else if(from == address(privateSale)){
+            privateSaleTokens[to] += amount;
+        } else if(from != address(0)) {
+            if((balanceOf(from) - _lockedAmount(from)) < amount) revert TransferingLockedTokens(_lockedAmount(from));
         }
     }
 }

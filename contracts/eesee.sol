@@ -130,8 +130,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
 
      * @return ID - ID of listing created.
-     * @return collection - Address of NFT collection contract.
-     * @return tokenID - ID of token that was minted.
+     * @return token - NFT minted.
      * Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract
      */
     function mintAndListItem(
@@ -141,14 +140,13 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID){
+    ) external returns(uint256 ID, NFT memory token){
         string[] memory tokenURIs = new string[](1);
         tokenURIs[0] = tokenURI;
         
-        uint256[] memory tokenIDs;
-        (collection, tokenIDs) = minter.mintToPublicCollection(1, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
-        tokenID = tokenIDs[0];
-        ID = _listItem(NFT(collection, tokenID), maxTickets, ticketPrice, duration);
+        (IERC721 collection, uint256[] memory tokenIDs) = minter.mintToPublicCollection(1, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
+        token = NFT(collection, tokenIDs[0]);
+        ID = _listItem(token, maxTickets, ticketPrice, duration);
     }
 
     /**
@@ -194,8 +192,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
      * @param royaltyFeeNumerator - Amount of royalties to collect from each NFT sale. [10000 = 100%].
      
      * @return ID - ID of listings created.
-     * @return collection - Address of NFT collection contract.
-     * @return tokenID - ID of tokens that were minted.
+     * @return token - NFT minted.
      * Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract.
      */
     function mintAndListItemWithDeploy(
@@ -208,11 +205,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable {
         uint256 duration,
         address royaltyReceiver,
         uint96 royaltyFeeNumerator
-    ) external returns(uint256 ID, IERC721 collection, uint256 tokenID){
-        uint256[] memory tokenIDs;
-        (collection, tokenIDs) = minter.mintToPrivateCollection(1, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
-        tokenID = tokenIDs[0];
-        ID = _listItem(NFT(collection, tokenID), maxTickets, ticketPrice, duration);
+    ) external returns(uint256 ID, NFT memory token){
+        (IERC721 collection, uint256[] memory tokenIDs) = minter.mintToPrivateCollection(1, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
+        token = NFT(collection, tokenIDs[0]);
+        ID = _listItem(token, maxTickets, ticketPrice, duration);
     }
 
     /**

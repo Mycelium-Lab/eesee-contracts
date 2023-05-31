@@ -18,6 +18,7 @@ const {
     let royaltyEninge;
     //after one year
     const zeroAddress = "0x0000000000000000000000000000000000000000"
+    const oneAddress = "0x0000000000000000000000000000000000000001"
   
     this.beforeAll(async() => {
         [signer, acc2, acc3, acc4, acc5, acc6, acc7, acc8, feeCollector, royaltyCollector] = await ethers.getSigners()
@@ -28,7 +29,24 @@ const {
         const _NFT = await hre.ethers.getContractFactory("eeseeNFT");
         const _minter = await hre.ethers.getContractFactory("eeseeMinter");
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
-        ESE = await _ESE.deploy('1000000000000000000000000')
+        const _privateSale = await hre.ethers.getContractFactory('ESECrowdsale')
+
+        const mockPresale = await _privateSale.deploy(125000000000000, oneAddress, oneAddress, oneAddress, 1000000000, 200000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
+        await mockPresale.deployed()
+
+        const mockPrivateSale = await _privateSale.deploy(71428571428571, oneAddress, oneAddress, oneAddress, 14000000000, 1660000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
+        await mockPrivateSale.deployed()
+
+        ESE = await _ESE.deploy(
+            '1000000000000000000000000', 
+            '50000000000000000000000000', 
+            mockPresale.address, 
+            31536000, 
+            '90000000000000000000000000', 
+            mockPrivateSale.address, 
+            10, 
+            5184000
+        )
         await ESE.deployed()
 
         mockVRF = await _mockVRF.deploy()

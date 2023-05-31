@@ -31,8 +31,25 @@ interface IeeseeNFTDrop {
         uint256 perAddressMintLimit;
         bytes32 allowListMerkleRoot;
     }
-    function mint(address recipient, uint256 quantity, bytes32[] memory merkleProof) external;
+
+    error MintTimestampNotInFuture();
+    error PresaleStageLimitExceeded();
+    error ZeroSaleStageDuration();
+    error MintLimitExceeded();
+    error MintingNotStarted();
+    error MintingEnded();
+    error NotInAllowlist();
+
+    function URI() external view returns (string memory);
+    function contractURI() external view returns (string memory);
+    function mintLimit() external view returns (uint256);
+    function mintedAmount() external view returns (uint256);
+
     function getSaleStage() external view returns (uint8 index);
     function stages(uint256) external view returns (uint256 startTimestamp, uint256 endTimestamp, StageOptions memory stageOptions);
+    
     function nextTokenId() external view returns (uint256);
+    function verifyCanMint(uint8 saleStageIndex, address claimer, bytes32[] memory merkleProof) external view returns (bool);
+
+    function mint(address recipient, uint256 quantity, bytes32[] memory merkleProof) external;
 }
