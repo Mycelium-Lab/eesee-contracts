@@ -68,7 +68,7 @@ const {
         royaltyEninge = await _royaltyEngine.deploy();
         await royaltyEninge.deployed()
 
-        mock1InchExecutor = await _mock1InchExecutor.deploy(ESE.address, ERC20.address);
+        mock1InchExecutor = await _mock1InchExecutor.deploy(ESE.address);
         await mock1InchExecutor.deployed()
         await ESE.transfer(mock1InchExecutor.address, '1000000000000000000000000')
         await ERC20.transfer(mock1InchExecutor.address, '1000000000000000000000000')
@@ -559,7 +559,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
@@ -576,7 +576,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
@@ -593,7 +593,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
@@ -610,7 +610,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
@@ -627,7 +627,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 1}))//
         .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
@@ -644,7 +644,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
 
         const balanceBefore = await ESE.balanceOf(signer.address)
@@ -672,7 +672,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 211}))//
         .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
@@ -689,7 +689,7 @@ const {
                 flags: 0,
             }, 
             '0x00',
-            '0x00'
+            '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
 
         const _balanceBefore = await ESE.balanceOf(acc9.address)

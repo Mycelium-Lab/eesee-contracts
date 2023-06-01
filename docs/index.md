@@ -1,5 +1,19 @@
 # Solidity API
 
+## Mock1InchExecutor
+
+### constructor
+
+```solidity
+constructor(contract IERC20 _ESE) public
+```
+
+### execute
+
+```solidity
+function execute(address msgSender, bytes data, uint256 amount) external payable
+```
+
 ## eesee
 
 ### listings
@@ -112,10 +126,32 @@ uint16 minimumRequestConfirmations
 
 _Chainlink VRF V2 request confirmations._
 
+### royaltyEngine
+
+```solidity
+contract IRoyaltyEngineV1 royaltyEngine
+```
+
+_The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract._
+
+### OneInchRouter
+
+```solidity
+address OneInchRouter
+```
+
+_1inch router used for token swaps._
+
+### receive
+
+```solidity
+receive() external payable
+```
+
 ### constructor
 
 ```solidity
-constructor(contract IERC20 _ESE, contract IeeseeMinter _minter, address _feeCollector, contract IRoyaltyEngineV1 _royaltyEngine, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit) public
+constructor(contract IERC20 _ESE, contract IeeseeMinter _minter, address _feeCollector, contract IRoyaltyEngineV1 _royaltyEngine, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit, address _OneInchRouter) public
 ```
 
 ### listItem
@@ -167,7 +203,7 @@ _Lists NFTs from sender's balance. Emits {ListItem} events for each NFT listed._
 ### mintAndListItem
 
 ```solidity
-function mintAndListItem(string tokenURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, contract IERC721 collection, uint256 tokenID)
+function mintAndListItem(string tokenURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, struct Ieesee.NFT token)
 ```
 
 _Mints NFT to a public collection and lists it. Emits {ListItem} event._
@@ -188,8 +224,7 @@ _Mints NFT to a public collection and lists it. Emits {ListItem} event._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | ID | uint256 | - ID of listing created. |
-| collection | contract IERC721 | - Address of NFT collection contract. |
-| tokenID | uint256 | - ID of token that was minted. Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract |
+| token | struct Ieesee.NFT | - NFT minted. Note This function costs less than mintAndListItemWithDeploy() but does not deploy additional NFT collection contract |
 
 ### mintAndListItems
 
@@ -221,7 +256,7 @@ _Mints NFTs to a public collection and lists them. Emits {ListItem} event for ea
 ### mintAndListItemWithDeploy
 
 ```solidity
-function mintAndListItemWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, contract IERC721 collection, uint256 tokenID)
+function mintAndListItemWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, struct Ieesee.NFT token)
 ```
 
 _Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListItem} event._
@@ -245,8 +280,7 @@ _Deploys new NFT collection contract, mints NFT to it and lists it. Emits {ListI
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | ID | uint256 | - ID of listings created. |
-| collection | contract IERC721 | - Address of NFT collection contract. |
-| tokenID | uint256 | - ID of tokens that were minted. Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract. |
+| token | struct Ieesee.NFT | - NFT minted. Note: This is more expensive than mintAndListItem() function but it deploys additional NFT contract. |
 
 ### mintAndListItemsWithDeploy
 
@@ -298,6 +332,28 @@ _Buys tickets to participate in a draw. Requests Chainlink to generate random wo
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | tokensSpent | uint256 | - ESE tokens spent. |
+
+### buyTicketsWithSwap
+
+```solidity
+function buyTicketsWithSwap(uint256 ID, bytes swapData) external payable returns (uint256 tokensSpent, uint256 ticketsBought)
+```
+
+_Buys tickets with any token using 1inch'es router and swapping it for ESE. Requests Chainlink to generate random words if all tickets have been bought. Emits {BuyTicket} event for each ticket bought._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ID | uint256 | - ID of a listing to buy tickets for. |
+| swapData | bytes | - Data for 1inch swap. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokensSpent | uint256 | - Tokens spent. |
+| ticketsBought | uint256 | - Tickets bought. |
 
 ### listDrop
 
@@ -514,6 +570,12 @@ _Get the amount of tickets bought by address in listing._
 function _listItem(struct Ieesee.NFT nft, uint256 maxTickets, uint256 ticketPrice, uint256 duration) internal returns (uint256 ID)
 ```
 
+### _buyTickets
+
+```solidity
+function _buyTickets(uint256 ID, uint256 amount) internal returns (uint256 tokensSpent)
+```
+
 ### _collectRoyalties
 
 ```solidity
@@ -624,6 +686,28 @@ _Fund function for Chainlink's VRF V2 subscription._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | amount | uint96 | - Amount of LINK to fund subscription with. |
+
+## IAggregationRouterV5
+
+### SwapDescription
+
+```solidity
+struct SwapDescription {
+  contract IERC20 srcToken;
+  contract IERC20 dstToken;
+  address payable srcReceiver;
+  address payable dstReceiver;
+  uint256 amount;
+  uint256 minReturnAmount;
+  uint256 flags;
+}
+```
+
+### swap
+
+```solidity
+function swap(address executor, struct IAggregationRouterV5.SwapDescription desc, bytes permit, bytes data) external payable returns (uint256 returnAmount, uint256 spentAmount)
+```
 
 ## IRoyaltyEngineV1
 
@@ -806,6 +890,174 @@ event ListDrop(uint256 ID, contract IERC721 collection, address earningsCollecto
 event MintDrop(uint256 ID, struct Ieesee.NFT nft, address sender, uint256 mintFee)
 ```
 
+### CallerNotOwner
+
+```solidity
+error CallerNotOwner(uint256 ID)
+```
+
+### CallerNotWinner
+
+```solidity
+error CallerNotWinner(uint256 ID)
+```
+
+### ItemAlreadyClaimed
+
+```solidity
+error ItemAlreadyClaimed(uint256 ID)
+```
+
+### TokensAlreadyClaimed
+
+```solidity
+error TokensAlreadyClaimed(uint256 ID)
+```
+
+### ListingAlreadyFulfilled
+
+```solidity
+error ListingAlreadyFulfilled(uint256 ID)
+```
+
+### ListingNotFulfilled
+
+```solidity
+error ListingNotFulfilled(uint256 ID)
+```
+
+### ListingExpired
+
+```solidity
+error ListingExpired(uint256 ID)
+```
+
+### ListingNotExpired
+
+```solidity
+error ListingNotExpired(uint256 ID)
+```
+
+### ListingNotExists
+
+```solidity
+error ListingNotExists(uint256 ID)
+```
+
+### DurationTooLow
+
+```solidity
+error DurationTooLow(uint256 minDuration)
+```
+
+### DurationTooHigh
+
+```solidity
+error DurationTooHigh(uint256 maxDuration)
+```
+
+### MaxTicketsTooLow
+
+```solidity
+error MaxTicketsTooLow()
+```
+
+### TicketPriceTooLow
+
+```solidity
+error TicketPriceTooLow()
+```
+
+### BuyAmountTooLow
+
+```solidity
+error BuyAmountTooLow()
+```
+
+### FeeTooHigh
+
+```solidity
+error FeeTooHigh()
+```
+
+### MaxTicketsBoughtByAddressTooHigh
+
+```solidity
+error MaxTicketsBoughtByAddressTooHigh()
+```
+
+### AllTicketsBought
+
+```solidity
+error AllTicketsBought()
+```
+
+### NoTicketsBought
+
+```solidity
+error NoTicketsBought(uint256 ID)
+```
+
+### MaxTicketsBoughtByAddress
+
+```solidity
+error MaxTicketsBoughtByAddress(address _address)
+```
+
+### InvalidArrayLengths
+
+```solidity
+error InvalidArrayLengths()
+```
+
+### InvalidSwapDescription
+
+```solidity
+error InvalidSwapDescription()
+```
+
+### InvalidMsgValue
+
+```solidity
+error InvalidMsgValue()
+```
+
+### InvalidEarningsCollector
+
+```solidity
+error InvalidEarningsCollector()
+```
+
+### InvalidQuantity
+
+```solidity
+error InvalidQuantity()
+```
+
+### InvalidRecipient
+
+```solidity
+error InvalidRecipient()
+```
+
+### SwapNotSuccessful
+
+```solidity
+error SwapNotSuccessful()
+```
+
+### TransferNotSuccessful
+
+```solidity
+error TransferNotSuccessful()
+```
+
+### EthDepositRejected
+
+```solidity
+error EthDepositRejected()
+```
+
 ### listings
 
 ```solidity
@@ -890,6 +1142,18 @@ function keyHash() external view returns (bytes32)
 function minimumRequestConfirmations() external view returns (uint16)
 ```
 
+### royaltyEngine
+
+```solidity
+function royaltyEngine() external view returns (contract IRoyaltyEngineV1)
+```
+
+### OneInchRouter
+
+```solidity
+function OneInchRouter() external view returns (address)
+```
+
 ### listItem
 
 ```solidity
@@ -905,7 +1169,7 @@ function listItems(struct Ieesee.NFT[] nfts, uint256[] maxTickets, uint256[] tic
 ### mintAndListItem
 
 ```solidity
-function mintAndListItem(string tokenURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, contract IERC721 collection, uint256 tokenID)
+function mintAndListItem(string tokenURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, struct Ieesee.NFT token)
 ```
 
 ### mintAndListItems
@@ -917,7 +1181,7 @@ function mintAndListItems(string[] tokenURIs, uint256[] maxTickets, uint256[] ti
 ### mintAndListItemWithDeploy
 
 ```solidity
-function mintAndListItemWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, contract IERC721 collection, uint256 tokenID)
+function mintAndListItemWithDeploy(string name, string symbol, string baseURI, string contractURI, uint256 maxTickets, uint256 ticketPrice, uint256 duration, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (uint256 ID, struct Ieesee.NFT token)
 ```
 
 ### mintAndListItemsWithDeploy
@@ -930,6 +1194,12 @@ function mintAndListItemsWithDeploy(string name, string symbol, string baseURI, 
 
 ```solidity
 function buyTickets(uint256 ID, uint256 amount) external returns (uint256 tokensSpent)
+```
+
+### buyTicketsWithSwap
+
+```solidity
+function buyTicketsWithSwap(uint256 ID, bytes swapData) external payable returns (uint256 tokensSpent, uint256 ticketsBought)
 ```
 
 ### listDrop
@@ -1024,10 +1294,16 @@ function fund(uint96 amount) external
 
 ## IeeseeMinter
 
+### IncorrectTokenURILength
+
+```solidity
+error IncorrectTokenURILength()
+```
+
 ### publicCollection
 
 ```solidity
-function publicCollection() external view returns (contract IERC721)
+function publicCollection() external view returns (contract IeeseeNFT)
 ```
 
 ### mintToPublicCollection
@@ -1046,6 +1322,62 @@ function mintToPrivateCollection(uint256 amount, string name, string symbol, str
 
 ```solidity
 function deployDropCollection(string name, string symbol, string URI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator, uint256 mintLimit, uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) external returns (contract IERC721 collection)
+```
+
+## IeeseeNFT
+
+### SetURIForNonexistentToken
+
+```solidity
+error SetURIForNonexistentToken()
+```
+
+### SetRoyaltyForNonexistentToken
+
+```solidity
+error SetRoyaltyForNonexistentToken()
+```
+
+### URI
+
+```solidity
+function URI() external view returns (string)
+```
+
+### contractURI
+
+```solidity
+function contractURI() external view returns (string)
+```
+
+### nextTokenId
+
+```solidity
+function nextTokenId() external view returns (uint256)
+```
+
+### mint
+
+```solidity
+function mint(address recipient, uint256 quantity) external
+```
+
+### setURIForTokenId
+
+```solidity
+function setURIForTokenId(uint256 tokenId, string _tokenURI) external
+```
+
+### setDefaultRoyalty
+
+```solidity
+function setDefaultRoyalty(address receiver, uint96 feeNumerator) external
+```
+
+### setRoyaltyForTokenId
+
+```solidity
+function setRoyaltyForTokenId(uint256 tokenId, address receiver, uint96 feeNumerator) external
 ```
 
 ## IeeseeNFTDrop
@@ -1073,10 +1405,70 @@ struct StageOptions {
 }
 ```
 
-### mint
+### MintTimestampNotInFuture
 
 ```solidity
-function mint(address recipient, uint256 quantity, bytes32[] merkleProof) external
+error MintTimestampNotInFuture()
+```
+
+### PresaleStageLimitExceeded
+
+```solidity
+error PresaleStageLimitExceeded()
+```
+
+### ZeroSaleStageDuration
+
+```solidity
+error ZeroSaleStageDuration()
+```
+
+### MintLimitExceeded
+
+```solidity
+error MintLimitExceeded()
+```
+
+### MintingNotStarted
+
+```solidity
+error MintingNotStarted()
+```
+
+### MintingEnded
+
+```solidity
+error MintingEnded()
+```
+
+### NotInAllowlist
+
+```solidity
+error NotInAllowlist()
+```
+
+### URI
+
+```solidity
+function URI() external view returns (string)
+```
+
+### contractURI
+
+```solidity
+function contractURI() external view returns (string)
+```
+
+### mintLimit
+
+```solidity
+function mintLimit() external view returns (uint256)
+```
+
+### mintedAmount
+
+```solidity
+function mintedAmount() external view returns (uint256)
 ```
 
 ### getSaleStage
@@ -1097,12 +1489,24 @@ function stages(uint256) external view returns (uint256 startTimestamp, uint256 
 function nextTokenId() external view returns (uint256)
 ```
 
+### verifyCanMint
+
+```solidity
+function verifyCanMint(uint8 saleStageIndex, address claimer, bytes32[] merkleProof) external view returns (bool)
+```
+
+### mint
+
+```solidity
+function mint(address recipient, uint256 quantity, bytes32[] merkleProof) external
+```
+
 ## eeseeMinter
 
 ### publicCollection
 
 ```solidity
-contract eeseeNFT publicCollection
+contract IeeseeNFT publicCollection
 ```
 
 _The collection contract NFTs are minted to to save gas._
@@ -1116,7 +1520,7 @@ constructor(string baseURI, string contractURI) public
 ### mintToPublicCollection
 
 ```solidity
-function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
+function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
 ```
 
 _Mints {amount} of NFTs to public collection to save gas._
@@ -1134,13 +1538,13 @@ _Mints {amount} of NFTs to public collection to save gas._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| collection | address | - Address of the collection the NFTs were minted to. |
+| collection | contract IERC721 | - Address of the collection the NFTs were minted to. |
 | tokenIDs | uint256[] | - IDs of tokens minted. |
 
 ### mintToPrivateCollection
 
 ```solidity
-function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (address collection, uint256[] tokenIDs)
+function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
 ```
 
 _Deploys a sepparate private collection contract and mints {amount} of NFTs to it._
@@ -1161,13 +1565,13 @@ _Deploys a sepparate private collection contract and mints {amount} of NFTs to i
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| collection | address | - Address of the collection the NFTs were minted to. |
+| collection | contract IERC721 | - Address of the collection the NFTs were minted to. |
 | tokenIDs | uint256[] | - IDs of tokens minted. |
 
 ### deployDropCollection
 
 ```solidity
-function deployDropCollection(string name, string symbol, string URI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator, uint256 mintLimit, uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) external returns (address collection)
+function deployDropCollection(string name, string symbol, string URI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator, uint256 mintLimit, uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) external returns (contract IERC721 collection)
 ```
 
 _Deploys a new drop collection contract._
@@ -1191,7 +1595,7 @@ _Deploys a new drop collection contract._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| collection | address | - Drops collection address |
+| collection | contract IERC721 | - Drops collection address |
 
 ## eeseeNFT
 
@@ -1210,18 +1614,6 @@ string contractURI
 ```
 
 _Opensea royalty and NFT collection info_
-
-### SetURIForNonexistentToken
-
-```solidity
-error SetURIForNonexistentToken()
-```
-
-### SetRoyaltyForNonexistentToken
-
-```solidity
-error SetRoyaltyForNonexistentToken()
-```
 
 ### constructor
 
@@ -1431,48 +1823,6 @@ struct IeeseeNFTDrop.SaleStage[] stages
 
 _Info about sale stages_
 
-### MintTimestampNotInFuture
-
-```solidity
-error MintTimestampNotInFuture()
-```
-
-### PresaleStageLimitExceeded
-
-```solidity
-error PresaleStageLimitExceeded()
-```
-
-### ZeroSaleStageDuration
-
-```solidity
-error ZeroSaleStageDuration()
-```
-
-### MintLimitExceeded
-
-```solidity
-error MintLimitExceeded()
-```
-
-### MintingNotStarted
-
-```solidity
-error MintingNotStarted()
-```
-
-### MintingEnded
-
-```solidity
-error MintingEnded()
-```
-
-### NotInAllowlist
-
-```solidity
-error NotInAllowlist()
-```
-
 ### constructor
 
 ```solidity
@@ -1616,14 +1966,6 @@ Emits a {Transfer} event._
 function supportsInterface(bytes4 interfaceId) public view returns (bool)
 ```
 
-## ESE
-
-### constructor
-
-```solidity
-constructor(uint256 amount) public
-```
-
 ## eeseePool
 
 ### Claim
@@ -1678,6 +2020,18 @@ event RewardAdded(uint256 rewardID, bytes32 merkleRoot)
 
 ```solidity
 event RewardClaimed(uint256 rewardID, address claimer, uint256 amount)
+```
+
+### InvalidMerkleProof
+
+```solidity
+error InvalidMerkleProof()
+```
+
+### AlreadyClaimed
+
+```solidity
+error AlreadyClaimed()
 ```
 
 ### constructor
@@ -1756,58 +2110,682 @@ _Verifies {claim} for {claimer}._
 | ---- | ---- | ----------- |
 | [0] | bool | bool - Does {claim} exist in merkle root. |
 
+## UniERC20
+
+### InsufficientBalance
+
+```solidity
+error InsufficientBalance()
+```
+
+### ApproveCalledOnETH
+
+```solidity
+error ApproveCalledOnETH()
+```
+
+### NotEnoughValue
+
+```solidity
+error NotEnoughValue()
+```
+
+### FromIsNotSender
+
+```solidity
+error FromIsNotSender()
+```
+
+### ToIsNotThis
+
+```solidity
+error ToIsNotThis()
+```
+
+### ETHTransferFailed
+
+```solidity
+error ETHTransferFailed()
+```
+
+### isETH
+
+```solidity
+function isETH(contract IERC20 token) internal pure returns (bool)
+```
+
+### uniBalanceOf
+
+```solidity
+function uniBalanceOf(contract IERC20 token, address account) internal view returns (uint256)
+```
+
+### uniTransfer
+
+```solidity
+function uniTransfer(contract IERC20 token, address payable to, uint256 amount) internal
+```
+
+_note that this function does nothing in case of zero amount_
+
+## IAggregationExecutor
+
+### execute
+
+```solidity
+function execute(address msgSender, bytes data, uint256 amount) external payable
+```
+
+propagates information about original msg.sender and executes arbitrary data
+
+## Mock1InchRouter
+
+### ZeroMinReturn
+
+```solidity
+error ZeroMinReturn()
+```
+
+### ZeroReturnAmount
+
+```solidity
+error ZeroReturnAmount()
+```
+
+### ReturnAmountIsNotEnough
+
+```solidity
+error ReturnAmountIsNotEnough()
+```
+
+### InvalidMsgValue
+
+```solidity
+error InvalidMsgValue()
+```
+
+### EthDepositRejected
+
+```solidity
+error EthDepositRejected()
+```
+
+### receive
+
+```solidity
+receive() external payable
+```
+
+### SwapDescription
+
+```solidity
+struct SwapDescription {
+  contract IERC20 srcToken;
+  contract IERC20 dstToken;
+  address payable srcReceiver;
+  address payable dstReceiver;
+  uint256 amount;
+  uint256 minReturnAmount;
+  uint256 flags;
+}
+```
+
+### swap
+
+```solidity
+function swap(contract IAggregationExecutor executor, struct Mock1InchRouter.SwapDescription desc, bytes permit, bytes data) external payable returns (uint256 returnAmount, uint256 spentAmount)
+```
+
+Performs a swap, delegating all calls encoded in `data` to `executor`. See tests for usage examples
+
+_router keeps 1 wei of every token on the contract balance for gas optimisations reasons. This affects first swap of every token by leaving 1 wei on the contract._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| executor | contract IAggregationExecutor | Aggregation executor that executes calls described in `data` |
+| desc | struct Mock1InchRouter.SwapDescription | Swap description |
+| permit | bytes | Should contain valid permit that can be used in `IERC20Permit.permit` calls. |
+| data | bytes | Encoded calls that `caller` should execute in between of swaps |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| returnAmount | uint256 | Resulting token amount |
+| spentAmount | uint256 | Source token amount |
+
+## ESECrowdsale
+
+_Functionality is adapted from OpenZeppelin's Crowdsale contracts._
+
+### ESE
+
+```solidity
+contract IERC20 ESE
+```
+
+_The token being sold_
+
+### token
+
+```solidity
+contract IERC20 token
+```
+
+_The token being bought_
+
+### wallet
+
+```solidity
+address wallet
+```
+
+_Address where funds are collected_
+
+### rate
+
+```solidity
+uint256 rate
+```
+
+_How many token units a buyer gets per wei.
+        The rate is the conversion between wei and the smallest and indivisible token unit.
+        So, if you are using a rate of 1 with a ERC20Detailed token with 3 decimals called TOK
+        1 wei will give you 1 unit, or 0.001 TOK._
+
+### minSellAmount
+
+```solidity
+uint256 minSellAmount
+```
+
+_Minimum/Maximum amounts of tokens that can be bought by a single account.(in ESE)_
+
+### maxSellAmount
+
+```solidity
+uint256 maxSellAmount
+```
+
+### openingTime
+
+```solidity
+uint256 openingTime
+```
+
+_The time when this crowdsale opens/closes._
+
+### closingTime
+
+```solidity
+uint256 closingTime
+```
+
+### whitelistMerkleRoot
+
+```solidity
+bytes32 whitelistMerkleRoot
+```
+
+_Whitelist Merkle Root. If == bytes32(0) everyone is whitelisted._
+
+### constructor
+
+```solidity
+constructor(uint256 _rate, address _wallet, contract IERC20 _ESE, contract IERC20 _token, uint256 _minSellAmount, uint256 _maxSellAmount, uint256 _openingTime, uint256 _closingTime, bytes32 _whitelistMerkleRoot) public
+```
+
+### isOpen
+
+```solidity
+function isOpen() public view returns (bool)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool - {true} if the crowdsale is open, {false} otherwise. |
+
+### hasClosed
+
+```solidity
+function hasClosed() public view returns (bool)
+```
+
+_Checks whether the period in which the crowdsale is open has already elapsed._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool - Whether crowdsale period has elapsed |
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address _address, bytes32[] merkleProof) public view returns (bool)
+```
+
+_Verifies that {_address} is whitelisted. If no {whitelistMerkleRoot} provided, everyone is whitelisted._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to verify claim for. |
+| merkleProof | bytes32[] | - Merkle Proof to verify. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool - Is whitelisted. |
+
+### buyESE
+
+```solidity
+function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensSpent)
+```
+
+_Buy ESE tokens from this contract. Forwards collected funds to {wallet}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| beneficiary | address | Recipient of the token purchase. |
+| amount | uint256 | Amount of ESE to buy. |
+| merkleProof | bytes32[] | Merkle Proof required for this purchase. |
+
+### changeWallet
+
+```solidity
+function changeWallet(address _wallet) external
+```
+
+_Changes wallet. Emits {ChangeWallet} event._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _wallet | address | - New wallet. Note: This function can only be called by owner. |
+
+### extendTime
+
+```solidity
+function extendTime(uint256 _closingTime) external
+```
+
+_Extend crowdsale._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _closingTime | uint256 | Crowdsale closing time |
+
+## ESE
+
+### presale
+
+```solidity
+contract IESECrowdsale presale
+```
+
+_Presale contract._
+
+### presaleStart
+
+```solidity
+uint256 presaleStart
+```
+
+_Presale start timestamp._
+
+### presaleUnlockTime
+
+```solidity
+uint256 presaleUnlockTime
+```
+
+_Time in which tokens will be unlocked._
+
+### privateSale
+
+```solidity
+contract IESECrowdsale privateSale
+```
+
+_Private sale contract._
+
+### privateSaleStart
+
+```solidity
+uint256 privateSaleStart
+```
+
+_Presale start timestamp._
+
+### privateSalePeriods
+
+```solidity
+uint256 privateSalePeriods
+```
+
+_Periods over which tokens will be unlocked._
+
+### privateSalePeriodTime
+
+```solidity
+uint256 privateSalePeriodTime
+```
+
+_Duration of each period._
+
+### lockPrivateSale
+
+```solidity
+bool lockPrivateSale
+```
+
+_False if ignore lock mechanism on private sales_
+
+### InvalidAmount
+
+```solidity
+error InvalidAmount()
+```
+
+### InvalidCrowdsale
+
+```solidity
+error InvalidCrowdsale()
+```
+
+### TransferingLockedTokens
+
+```solidity
+error TransferingLockedTokens(uint256 tokensLocked)
+```
+
+### constructor
+
+```solidity
+constructor(uint256 amount, uint256 _presaleAmount, contract IESECrowdsale _presale, uint256 _presaleUnlockTime, uint256 _privateSaleAmount, contract IESECrowdsale _privateSale, uint256 _privateSalePeriods, uint256 _privateSalePeriodTime) public
+```
+
+### lockedAmount
+
+```solidity
+function lockedAmount(address _address) external view returns (uint256)
+```
+
+_Returns locked tokens for an {_address}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Amount of tokens locked. |
+
+### available
+
+```solidity
+function available(address _address) external view returns (uint256)
+```
+
+_Returns tokens available for an {_address} to transfer._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Amount of tokens available. |
+
+### _beforeTokenTransfer
+
+```solidity
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual
+```
+
+_Hook that is called before any transfer of tokens. This includes
+minting and burning.
+
+Calling conditions:
+
+- when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
+will be transferred to `to`.
+- when `from` is zero, `amount` tokens will be minted for `to`.
+- when `to` is zero, `amount` of ``from``'s tokens will be burned.
+- `from` and `to` are never both zero.
+
+To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks]._
+
+## IESECrowdsale
+
+### TokensPurchased
+
+```solidity
+event TokensPurchased(address purchaser, address beneficiary, uint256 value, uint256 amount)
+```
+
+### ChangeWallet
+
+```solidity
+event ChangeWallet(address previousWallet, address newWallet)
+```
+
+### TimedCrowdsaleExtended
+
+```solidity
+event TimedCrowdsaleExtended(uint256 previousClosingTime, uint256 newClosingTime)
+```
+
+### AlreadyClosed
+
+```solidity
+error AlreadyClosed(uint256 closingTime)
+```
+
+### NotOpen
+
+```solidity
+error NotOpen()
+```
+
+### NotWhitelisted
+
+```solidity
+error NotWhitelisted()
+```
+
+### InvalidBeneficiary
+
+```solidity
+error InvalidBeneficiary()
+```
+
+### InvalidRate
+
+```solidity
+error InvalidRate()
+```
+
+### InvalidWallet
+
+```solidity
+error InvalidWallet()
+```
+
+### InvalidESE
+
+```solidity
+error InvalidESE()
+```
+
+### InvalidOpeningTime
+
+```solidity
+error InvalidOpeningTime()
+```
+
+### InvalidClosingTime
+
+```solidity
+error InvalidClosingTime()
+```
+
+### InvalidToken
+
+```solidity
+error InvalidToken()
+```
+
+### InvalidMaxSellAmount
+
+```solidity
+error InvalidMaxSellAmount()
+```
+
+### SellAmountTooHigh
+
+```solidity
+error SellAmountTooHigh(uint256 maxSellAmount)
+```
+
+### SellAmountTooLow
+
+```solidity
+error SellAmountTooLow(uint256 minSellAmount)
+```
+
+### MinSellAmountTooHigh
+
+```solidity
+error MinSellAmountTooHigh(uint256 cap)
+```
+
+### ESE
+
+```solidity
+function ESE() external view returns (contract IERC20)
+```
+
+### token
+
+```solidity
+function token() external view returns (contract IERC20)
+```
+
+### wallet
+
+```solidity
+function wallet() external view returns (address)
+```
+
+### rate
+
+```solidity
+function rate() external view returns (uint256)
+```
+
+### minSellAmount
+
+```solidity
+function minSellAmount() external view returns (uint256)
+```
+
+### maxSellAmount
+
+```solidity
+function maxSellAmount() external view returns (uint256)
+```
+
+### openingTime
+
+```solidity
+function openingTime() external view returns (uint256)
+```
+
+### whitelistMerkleRoot
+
+```solidity
+function whitelistMerkleRoot() external view returns (bytes32)
+```
+
+### isOpen
+
+```solidity
+function isOpen() external view returns (bool)
+```
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address _address, bytes32[] merkleProof) external view returns (bool)
+```
+
+### buyESE
+
+```solidity
+function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensBought)
+```
+
+### changeWallet
+
+```solidity
+function changeWallet(address _wallet) external
+```
+
+## MockESECrowdsale
+
+### openingTime
+
+```solidity
+uint256 openingTime
+```
+
+### constructor
+
+```solidity
+constructor() public
+```
+
+### transfer
+
+```solidity
+function transfer(contract IERC20 token, address to, uint256 amount) external
+```
+
+## MockERC20
+
+### constructor
+
+```solidity
+constructor(uint256 amount) public
+```
+
 ## MockRoyaltyEngine
 
 ### getRoyalty
 
 ```solidity
 function getRoyalty(address tokenAddress, uint256 tokenId, uint256 value) public view returns (address payable[] recipients, uint256[] amounts)
-```
-
-## MockVRFCoordinator
-
-### VRF
-
-```solidity
-struct VRF {
-  contract VRFConsumerBaseV2 consumer;
-  uint32 callbackGasLimit;
-}
-```
-
-### counter
-
-```solidity
-uint256 counter
-```
-
-### vrf
-
-```solidity
-mapping(uint256 => struct MockVRFCoordinator.VRF) vrf
-```
-
-### requestRandomWords
-
-```solidity
-function requestRandomWords(bytes32, uint64, uint16, uint32 callbackGasLimit, uint32) external returns (uint256)
-```
-
-### fulfillWords
-
-```solidity
-function fulfillWords(uint256 requestId) external
-```
-
-### createSubscription
-
-```solidity
-function createSubscription() external returns (uint64 subscriptionID)
-```
-
-### addConsumer
-
-```solidity
-function addConsumer(uint64, address) external
 ```
 
