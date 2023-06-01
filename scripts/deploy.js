@@ -8,7 +8,9 @@ const { network, run, ethers } = require("hardhat");
 const { getContractAddress } = require('@ethersproject/address')
 
 async function verify(contract, constructorArguments, name){
-    await contract.deployTransaction.wait(5);
+    console.log('...Deploying ' + name)
+    await contract.deployTransaction.wait(4);
+    console.log('...Verifying on block explorer ' + name)
     try {
         await run("verify:verify", {
             address: contract.address,
@@ -27,13 +29,6 @@ async function main() {
     const pool = await ethers.getContractFactory("eeseePool");
     const eesee = await ethers.getContractFactory("eesee");
 
-    const [owner] = await ethers.getSigners()
-    const transactionCount = await owner.getTransactionCount()
-    const futureESEAddress = getContractAddress({
-      from: owner.address,
-      nonce: transactionCount+2
-    })
-
     let USDT
     if(network.name === 'goerli'){
         const MockERC20 = await ethers.getContractFactory("MockERC20");
@@ -47,6 +42,13 @@ async function main() {
     }else{
         return
     }
+
+    const [owner] = await ethers.getSigners()
+    const transactionCount = await owner.getTransactionCount()
+    const futureESEAddress = getContractAddress({
+      from: owner.address,
+      nonce: transactionCount+2
+    })
 
     let args
     const date = parseInt(Date.now() / 1000)
@@ -71,8 +73,8 @@ async function main() {
         USDT, 
         ethers.utils.parseUnits('1000000', 'ether'), //Min ESE  ($14000)
         ethers.utils.parseUnits('90000000', 'ether'), //Max ESE ($1260000)
+        date + 600, //TODO: change
         date + 31536000, //TODO: change
-        date + 2*31536000, //TODO: change
         '0x0000000000000000000000000000000000000000000000000000000000000000'//TODO: change
     ]
     const PrivateSale = await ESECrowdsale.deploy(...args)

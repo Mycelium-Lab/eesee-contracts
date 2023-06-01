@@ -7,4 +7,7 @@ contract MockERC20 is ERC20 {
     constructor(uint256 amount) ERC20("erc", "ERC20") {
         _mint(msg.sender, amount);
     }
+    function decimals() public pure override returns (uint8) {
+        return 6;
+    }
 }
