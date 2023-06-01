@@ -1,17 +1,789 @@
 # Solidity API
 
-## Mock1InchExecutor
+## ESECrowdsale
+
+_Functionality is adapted from OpenZeppelin's Crowdsale contracts._
+
+### ESE
+
+```solidity
+contract IERC20 ESE
+```
+
+_The token being sold_
+
+### token
+
+```solidity
+contract IERC20 token
+```
+
+_The token being bought_
+
+### wallet
+
+```solidity
+address wallet
+```
+
+_Address where funds are collected_
+
+### rate
+
+```solidity
+uint256 rate
+```
+
+_How many token units a buyer gets per wei.
+        The rate is the conversion between wei and the smallest and indivisible token unit.
+        So, if you are using a rate of 1 with a ERC20Detailed token with 3 decimals called TOK
+        1 wei will give you 1 unit, or 0.001 TOK._
+
+### minSellAmount
+
+```solidity
+uint256 minSellAmount
+```
+
+_Minimum/Maximum amounts of tokens that can be bought by a single account.(in ESE)_
+
+### maxSellAmount
+
+```solidity
+uint256 maxSellAmount
+```
+
+### openingTime
+
+```solidity
+uint256 openingTime
+```
+
+_The time when this crowdsale opens/closes._
+
+### closingTime
+
+```solidity
+uint256 closingTime
+```
+
+### whitelistMerkleRoot
+
+```solidity
+bytes32 whitelistMerkleRoot
+```
+
+_Whitelist Merkle Root. If == bytes32(0) everyone is whitelisted._
 
 ### constructor
 
 ```solidity
-constructor(contract IERC20 _ESE) public
+constructor(uint256 _rate, address _wallet, contract IERC20 _ESE, contract IERC20 _token, uint256 _minSellAmount, uint256 _maxSellAmount, uint256 _openingTime, uint256 _closingTime, bytes32 _whitelistMerkleRoot) public
 ```
 
-### execute
+### isOpen
 
 ```solidity
-function execute(address msgSender, bytes data, uint256 amount) external payable
+function isOpen() public view returns (bool)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool - {true} if the crowdsale is open, {false} otherwise. |
+
+### hasClosed
+
+```solidity
+function hasClosed() public view returns (bool)
+```
+
+_Checks whether the period in which the crowdsale is open has already elapsed._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool - Whether crowdsale period has elapsed |
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address _address, bytes32[] merkleProof) public view returns (bool)
+```
+
+_Verifies that {_address} is whitelisted. If no {whitelistMerkleRoot} provided, everyone is whitelisted._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to verify claim for. |
+| merkleProof | bytes32[] | - Merkle Proof to verify. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool - Is whitelisted. |
+
+### buyESE
+
+```solidity
+function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensSpent)
+```
+
+_Buy ESE tokens from this contract. Forwards collected funds to {wallet}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| beneficiary | address | Recipient of the token purchase. |
+| amount | uint256 | Amount of ESE to buy. |
+| merkleProof | bytes32[] | Merkle Proof required for this purchase. |
+
+### changeWallet
+
+```solidity
+function changeWallet(address _wallet) external
+```
+
+_Changes wallet. Emits {ChangeWallet} event._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _wallet | address | - New wallet. Note: This function can only be called by owner. |
+
+### extendTime
+
+```solidity
+function extendTime(uint256 _closingTime) external
+```
+
+_Extend crowdsale._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _closingTime | uint256 | Crowdsale closing time |
+
+## ESE
+
+### presale
+
+```solidity
+contract IESECrowdsale presale
+```
+
+_Presale contract._
+
+### presaleStart
+
+```solidity
+uint256 presaleStart
+```
+
+_Presale start timestamp._
+
+### presaleUnlockTime
+
+```solidity
+uint256 presaleUnlockTime
+```
+
+_Time in which tokens will be unlocked._
+
+### privateSale
+
+```solidity
+contract IESECrowdsale privateSale
+```
+
+_Private sale contract._
+
+### privateSaleStart
+
+```solidity
+uint256 privateSaleStart
+```
+
+_Presale start timestamp._
+
+### privateSalePeriods
+
+```solidity
+uint256 privateSalePeriods
+```
+
+_Periods over which tokens will be unlocked._
+
+### privateSalePeriodTime
+
+```solidity
+uint256 privateSalePeriodTime
+```
+
+_Duration of each period._
+
+### lockPrivateSale
+
+```solidity
+bool lockPrivateSale
+```
+
+_False if ignore lock mechanism on private sales_
+
+### InvalidAmount
+
+```solidity
+error InvalidAmount()
+```
+
+### InvalidCrowdsale
+
+```solidity
+error InvalidCrowdsale()
+```
+
+### TransferingLockedTokens
+
+```solidity
+error TransferingLockedTokens(uint256 tokensLocked)
+```
+
+### constructor
+
+```solidity
+constructor(uint256 amount, uint256 _presaleAmount, contract IESECrowdsale _presale, uint256 _presaleUnlockTime, uint256 _privateSaleAmount, contract IESECrowdsale _privateSale, uint256 _privateSalePeriods, uint256 _privateSalePeriodTime) public
+```
+
+### lockedAmount
+
+```solidity
+function lockedAmount(address _address) external view returns (uint256)
+```
+
+_Returns locked tokens for an {_address}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Amount of tokens locked. |
+
+### available
+
+```solidity
+function available(address _address) external view returns (uint256)
+```
+
+_Returns tokens available for an {_address} to transfer._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Amount of tokens available. |
+
+### _beforeTokenTransfer
+
+```solidity
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual
+```
+
+_Hook that is called before any transfer of tokens. This includes
+minting and burning.
+
+Calling conditions:
+
+- when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
+will be transferred to `to`.
+- when `from` is zero, `amount` tokens will be minted for `to`.
+- when `to` is zero, `amount` of ``from``'s tokens will be burned.
+- `from` and `to` are never both zero.
+
+To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks]._
+
+## eeseeMinter
+
+### publicCollection
+
+```solidity
+contract IeeseeNFT publicCollection
+```
+
+_The collection contract NFTs are minted to to save gas._
+
+### constructor
+
+```solidity
+constructor(string baseURI, string contractURI) public
+```
+
+### mintToPublicCollection
+
+```solidity
+function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
+```
+
+_Mints {amount} of NFTs to public collection to save gas._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of NFTs to mint. |
+| tokenURIs | string[] | - Metadata URIs of all NFTs minted. |
+| royaltyReceiver | address | -  Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| collection | contract IERC721 | - Address of the collection the NFTs were minted to. |
+| tokenIDs | uint256[] | - IDs of tokens minted. |
+
+### mintToPrivateCollection
+
+```solidity
+function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
+```
+
+_Deploys a sepparate private collection contract and mints {amount} of NFTs to it._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of NFTs to mint. |
+| name | string | - The name for a collection. |
+| symbol | string | - The symbol of the collection. |
+| baseURI | string | - Collection metadata URI. |
+| contractURI | string | - Contract URI for opensea's royalties. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| collection | contract IERC721 | - Address of the collection the NFTs were minted to. |
+| tokenIDs | uint256[] | - IDs of tokens minted. |
+
+### deployDropCollection
+
+```solidity
+function deployDropCollection(string name, string symbol, string URI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator, uint256 mintLimit, uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) external returns (contract IERC721 collection)
+```
+
+_Deploys a new drop collection contract._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| name | string | - The name for a collection. |
+| symbol | string | - The symbol of the collection. |
+| URI | string | - Collection metadata URI. |
+| contractURI | string | - Contract URI for opensea's royalties. |
+| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
+| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
+| mintLimit | uint256 | - NFT mint cap |
+| mintStartTimestamp | uint256 | - Mint start timestamp |
+| publicStageOptions | struct IeeseeNFTDrop.StageOptions | - Option for the public NFT sale |
+| presalesOptions | struct IeeseeNFTDrop.StageOptions[] | - Options for the NFT presales |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| collection | contract IERC721 | - Drops collection address |
+
+## eeseeNFT
+
+### URI
+
+```solidity
+string URI
+```
+
+_baseURI this contract uses,_
+
+### contractURI
+
+```solidity
+string contractURI
+```
+
+_Opensea royalty and NFT collection info_
+
+### constructor
+
+```solidity
+constructor(string name, string symbol, string _URI, string _contractURI) public
+```
+
+### tokenURI
+
+```solidity
+function tokenURI(uint256 tokenId) public view virtual returns (string)
+```
+
+_Returns tokenId's token URI. If there is no URI in tokenURIs uses baseURI._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenId | uint256 | - Token ID to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | string | string Token URI. |
+
+### nextTokenId
+
+```solidity
+function nextTokenId() external view returns (uint256)
+```
+
+_Returns next token ID to be minted._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 Token ID. |
+
+### mint
+
+```solidity
+function mint(address recipient, uint256 quantity) external
+```
+
+_Mints a {quantity} of NFTs and sends them to the {recipient}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| recipient | address | - Receiver of NFTs. |
+| quantity | uint256 | - Quantity of NFTs to mint.       Note: This function can only be called by owner. |
+
+### setURIForTokenId
+
+```solidity
+function setURIForTokenId(uint256 tokenId, string _tokenURI) external
+```
+
+_Sets {_tokenURI} for a specified {tokenId}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenId | uint256 | - Token ID to set URI for. |
+| _tokenURI | string | - Token URI.       Note: This function can only be called by owner. |
+
+### setDefaultRoyalty
+
+```solidity
+function setDefaultRoyalty(address receiver, uint96 feeNumerator) external
+```
+
+_Sets default royalty for this collection._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| receiver | address | - Royalty receiver. |
+| feeNumerator | uint96 | - Royalty amount. [10000 == 100%].       Note: This function can only be called by owner. |
+
+### setRoyaltyForTokenId
+
+```solidity
+function setRoyaltyForTokenId(uint256 tokenId, address receiver, uint96 feeNumerator) external
+```
+
+_Sets royalty for a single {tokenId} in the collection._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| tokenId | uint256 | - Token ID to set royalty for. |
+| receiver | address | - Royalty receiver. |
+| feeNumerator | uint96 | - Royalty amount. [10000 == 100%].       Note: This function can only be called by owner. |
+
+### _startTokenId
+
+```solidity
+function _startTokenId() internal pure returns (uint256)
+```
+
+_Returns the starting token ID.
+To change the starting token ID, please override this function._
+
+### _baseURI
+
+```solidity
+function _baseURI() internal view returns (string)
+```
+
+_Base URI for computing {tokenURI}. If set, the resulting URI for each
+token will be the concatenation of the `baseURI` and the `tokenId`. Empty
+by default, it can be overridden in child contracts._
+
+### setApprovalForAll
+
+```solidity
+function setApprovalForAll(address operator, bool approved) public
+```
+
+_Approve or remove `operator` as an operator for the caller.
+Operators can call {transferFrom} or {safeTransferFrom}
+for any token owned by the caller.
+
+Requirements:
+
+- The `operator` cannot be the caller.
+
+Emits an {ApprovalForAll} event._
+
+### approve
+
+```solidity
+function approve(address operator, uint256 tokenId) public payable
+```
+
+### transferFrom
+
+```solidity
+function transferFrom(address from, address to, uint256 tokenId) public payable
+```
+
+_Transfers `tokenId` from `from` to `to`.
+
+Requirements:
+
+- `from` cannot be the zero address.
+- `to` cannot be the zero address.
+- `tokenId` token must be owned by `from`.
+- If the caller is not `from`, it must be approved to move this token
+by either {approve} or {setApprovalForAll}.
+
+Emits a {Transfer} event._
+
+### supportsInterface
+
+```solidity
+function supportsInterface(bytes4 interfaceId) public view returns (bool)
+```
+
+## eeseeNFTDrop
+
+### URI
+
+```solidity
+string URI
+```
+
+_baseURI this contract uses,_
+
+### contractURI
+
+```solidity
+string contractURI
+```
+
+_Opensea royalty and NFT collection info_
+
+### mintLimit
+
+```solidity
+uint256 mintLimit
+```
+
+_Mint cap_
+
+### mintedAmount
+
+```solidity
+uint256 mintedAmount
+```
+
+_Current amount of minted nfts_
+
+### stages
+
+```solidity
+struct IeeseeNFTDrop.SaleStage[] stages
+```
+
+_Info about sale stages_
+
+### constructor
+
+```solidity
+constructor(string name, string symbol, string _URI, string _contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator, uint256 _mintLimit, uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) public
+```
+
+### verifyCanMint
+
+```solidity
+function verifyCanMint(uint8 saleStageIndex, address claimer, bytes32[] merkleProof) public view returns (bool)
+```
+
+_Verifies that a user is in allowlist of saleStageIndex sale stage._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| saleStageIndex | uint8 | - Index of the sale stage. |
+| claimer | address | - Address of a user. |
+| merkleProof | bytes32[] | - Merkle proof of stage's merkle tree. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool true if user in stage's allowlist. |
+
+### getSaleStage
+
+```solidity
+function getSaleStage() public view returns (uint8 index)
+```
+
+_Returns current sale stages index._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| index | uint8 | - Index of current sale stage. |
+
+### nextTokenId
+
+```solidity
+function nextTokenId() external view returns (uint256)
+```
+
+_Returns next token ID to be minted._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 Token ID. |
+
+### mint
+
+```solidity
+function mint(address recipient, uint256 quantity, bytes32[] merkleProof) external
+```
+
+_Mints nfts for recipient in the merkle tree._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| recipient | address | - Address of recipient. |
+| quantity | uint256 | - Amount of nfts to mint. |
+| merkleProof | bytes32[] | - Merkle tree proof of transaction sender's address.  Note: This function can only be called by owner. |
+
+### _startTokenId
+
+```solidity
+function _startTokenId() internal pure returns (uint256)
+```
+
+_Returns the starting token ID.
+To change the starting token ID, please override this function._
+
+### _baseURI
+
+```solidity
+function _baseURI() internal view returns (string)
+```
+
+_Base URI for computing {tokenURI}. If set, the resulting URI for each
+token will be the concatenation of the `baseURI` and the `tokenId`. Empty
+by default, it can be overridden in child contracts._
+
+### _setMintStageOptions
+
+```solidity
+function _setMintStageOptions(uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) internal
+```
+
+### setApprovalForAll
+
+```solidity
+function setApprovalForAll(address operator, bool approved) public
+```
+
+_Approve or remove `operator` as an operator for the caller.
+Operators can call {transferFrom} or {safeTransferFrom}
+for any token owned by the caller.
+
+Requirements:
+
+- The `operator` cannot be the caller.
+
+Emits an {ApprovalForAll} event._
+
+### approve
+
+```solidity
+function approve(address operator, uint256 tokenId) public payable
+```
+
+### transferFrom
+
+```solidity
+function transferFrom(address from, address to, uint256 tokenId) public payable
+```
+
+_Transfers `tokenId` from `from` to `to`.
+
+Requirements:
+
+- `from` cannot be the zero address.
+- `to` cannot be the zero address.
+- `tokenId` token must be owned by `from`.
+- If the caller is not `from`, it must be approved to move this token
+by either {approve} or {setApprovalForAll}.
+
+Emits a {Transfer} event._
+
+### supportsInterface
+
+```solidity
+function supportsInterface(bytes4 interfaceId) public view returns (bool)
 ```
 
 ## eesee
@@ -687,6 +1459,150 @@ _Fund function for Chainlink's VRF V2 subscription._
 | ---- | ---- | ----------- |
 | amount | uint96 | - Amount of LINK to fund subscription with. |
 
+## eeseePool
+
+### Claim
+
+```solidity
+struct Claim {
+  uint256 rewardID;
+  uint256 balance;
+  bytes32[] merkleProof;
+}
+```
+
+### rewardToken
+
+```solidity
+contract IERC20 rewardToken
+```
+
+_ESE token this contract uses._
+
+### rewardID
+
+```solidity
+uint256 rewardID
+```
+
+_Current reward ID._
+
+### rewardRoot
+
+```solidity
+mapping(uint256 => bytes32) rewardRoot
+```
+
+_Maps {rewardID} to its merkle root._
+
+### isClaimed
+
+```solidity
+mapping(address => mapping(uint256 => bool)) isClaimed
+```
+
+_Has address claimed reward for {rewardID}._
+
+### RewardAdded
+
+```solidity
+event RewardAdded(uint256 rewardID, bytes32 merkleRoot)
+```
+
+### RewardClaimed
+
+```solidity
+event RewardClaimed(uint256 rewardID, address claimer, uint256 amount)
+```
+
+### InvalidMerkleProof
+
+```solidity
+error InvalidMerkleProof()
+```
+
+### AlreadyClaimed
+
+```solidity
+error AlreadyClaimed()
+```
+
+### constructor
+
+```solidity
+constructor(contract IERC20 _rewardToken) public
+```
+
+### claimRewards
+
+```solidity
+function claimRewards(struct eeseePool.Claim[] claims) external
+```
+
+_Claims rewards for multiple {rewardID}s. Emits {RewardClaimed} event for each reward claimed._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| claims | struct eeseePool.Claim[] | - Claim structs. |
+
+### addReward
+
+```solidity
+function addReward(bytes32 merkleRoot) external
+```
+
+_Adds new merkle root and advances to the next {rewardID}. Emits {RewardAdded} event._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| merkleRoot | bytes32 | - Merkle root. |
+
+### getRewards
+
+```solidity
+function getRewards(address claimer, struct eeseePool.Claim[] claims) external view returns (uint256 rewards)
+```
+
+_Verifies {claims} and returns rewards to be claimed from {claims}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| claimer | address | - Address to check. |
+| claims | struct eeseePool.Claim[] | - Claims to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| rewards | uint256 | - Rewards to be claimed. |
+
+### verifyClaim
+
+```solidity
+function verifyClaim(address claimer, struct eeseePool.Claim claim) public view returns (bool)
+```
+
+_Verifies {claim} for {claimer}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| claimer | address | - Address to verify claim for. |
+| claim | struct eeseePool.Claim | - Claim to verify. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool - Does {claim} exist in merkle root. |
+
 ## IAggregationRouterV5
 
 ### SwapDescription
@@ -707,6 +1623,182 @@ struct SwapDescription {
 
 ```solidity
 function swap(address executor, struct IAggregationRouterV5.SwapDescription desc, bytes permit, bytes data) external payable returns (uint256 returnAmount, uint256 spentAmount)
+```
+
+## IESECrowdsale
+
+### TokensPurchased
+
+```solidity
+event TokensPurchased(address purchaser, address beneficiary, uint256 value, uint256 amount)
+```
+
+### ChangeWallet
+
+```solidity
+event ChangeWallet(address previousWallet, address newWallet)
+```
+
+### TimedCrowdsaleExtended
+
+```solidity
+event TimedCrowdsaleExtended(uint256 previousClosingTime, uint256 newClosingTime)
+```
+
+### AlreadyClosed
+
+```solidity
+error AlreadyClosed(uint256 closingTime)
+```
+
+### NotOpen
+
+```solidity
+error NotOpen()
+```
+
+### NotWhitelisted
+
+```solidity
+error NotWhitelisted()
+```
+
+### InvalidBeneficiary
+
+```solidity
+error InvalidBeneficiary()
+```
+
+### InvalidRate
+
+```solidity
+error InvalidRate()
+```
+
+### InvalidWallet
+
+```solidity
+error InvalidWallet()
+```
+
+### InvalidESE
+
+```solidity
+error InvalidESE()
+```
+
+### InvalidOpeningTime
+
+```solidity
+error InvalidOpeningTime()
+```
+
+### InvalidClosingTime
+
+```solidity
+error InvalidClosingTime()
+```
+
+### InvalidToken
+
+```solidity
+error InvalidToken()
+```
+
+### InvalidMaxSellAmount
+
+```solidity
+error InvalidMaxSellAmount()
+```
+
+### SellAmountTooHigh
+
+```solidity
+error SellAmountTooHigh(uint256 maxSellAmount)
+```
+
+### SellAmountTooLow
+
+```solidity
+error SellAmountTooLow(uint256 minSellAmount)
+```
+
+### MinSellAmountTooHigh
+
+```solidity
+error MinSellAmountTooHigh(uint256 cap)
+```
+
+### ESE
+
+```solidity
+function ESE() external view returns (contract IERC20)
+```
+
+### token
+
+```solidity
+function token() external view returns (contract IERC20)
+```
+
+### wallet
+
+```solidity
+function wallet() external view returns (address)
+```
+
+### rate
+
+```solidity
+function rate() external view returns (uint256)
+```
+
+### minSellAmount
+
+```solidity
+function minSellAmount() external view returns (uint256)
+```
+
+### maxSellAmount
+
+```solidity
+function maxSellAmount() external view returns (uint256)
+```
+
+### openingTime
+
+```solidity
+function openingTime() external view returns (uint256)
+```
+
+### whitelistMerkleRoot
+
+```solidity
+function whitelistMerkleRoot() external view returns (bytes32)
+```
+
+### isOpen
+
+```solidity
+function isOpen() external view returns (bool)
+```
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address _address, bytes32[] merkleProof) external view returns (bool)
+```
+
+### buyESE
+
+```solidity
+function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensBought)
+```
+
+### changeWallet
+
+```solidity
+function changeWallet(address _wallet) external
 ```
 
 ## IRoyaltyEngineV1
@@ -1501,614 +2593,19 @@ function verifyCanMint(uint8 saleStageIndex, address claimer, bytes32[] merklePr
 function mint(address recipient, uint256 quantity, bytes32[] merkleProof) external
 ```
 
-## eeseeMinter
-
-### publicCollection
-
-```solidity
-contract IeeseeNFT publicCollection
-```
-
-_The collection contract NFTs are minted to to save gas._
+## Mock1InchExecutor
 
 ### constructor
 
 ```solidity
-constructor(string baseURI, string contractURI) public
+constructor(contract IERC20 _ESE) public
 ```
 
-### mintToPublicCollection
+### execute
 
 ```solidity
-function mintToPublicCollection(uint256 amount, string[] tokenURIs, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
+function execute(address msgSender, bytes data, uint256 amount) external payable
 ```
-
-_Mints {amount} of NFTs to public collection to save gas._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| amount | uint256 | - Amount of NFTs to mint. |
-| tokenURIs | string[] | - Metadata URIs of all NFTs minted. |
-| royaltyReceiver | address | -  Receiver of royalties from each NFT sale. |
-| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| collection | contract IERC721 | - Address of the collection the NFTs were minted to. |
-| tokenIDs | uint256[] | - IDs of tokens minted. |
-
-### mintToPrivateCollection
-
-```solidity
-function mintToPrivateCollection(uint256 amount, string name, string symbol, string baseURI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator) external returns (contract IERC721 collection, uint256[] tokenIDs)
-```
-
-_Deploys a sepparate private collection contract and mints {amount} of NFTs to it._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| amount | uint256 | - Amount of NFTs to mint. |
-| name | string | - The name for a collection. |
-| symbol | string | - The symbol of the collection. |
-| baseURI | string | - Collection metadata URI. |
-| contractURI | string | - Contract URI for opensea's royalties. |
-| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
-| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| collection | contract IERC721 | - Address of the collection the NFTs were minted to. |
-| tokenIDs | uint256[] | - IDs of tokens minted. |
-
-### deployDropCollection
-
-```solidity
-function deployDropCollection(string name, string symbol, string URI, string contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator, uint256 mintLimit, uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) external returns (contract IERC721 collection)
-```
-
-_Deploys a new drop collection contract._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| name | string | - The name for a collection. |
-| symbol | string | - The symbol of the collection. |
-| URI | string | - Collection metadata URI. |
-| contractURI | string | - Contract URI for opensea's royalties. |
-| royaltyReceiver | address | - Receiver of royalties from each NFT sale. |
-| royaltyFeeNumerator | uint96 | - Amount of royalties to collect from each NFT sale. [10000 = 100%]. |
-| mintLimit | uint256 | - NFT mint cap |
-| mintStartTimestamp | uint256 | - Mint start timestamp |
-| publicStageOptions | struct IeeseeNFTDrop.StageOptions | - Option for the public NFT sale |
-| presalesOptions | struct IeeseeNFTDrop.StageOptions[] | - Options for the NFT presales |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| collection | contract IERC721 | - Drops collection address |
-
-## eeseeNFT
-
-### URI
-
-```solidity
-string URI
-```
-
-_baseURI this contract uses,_
-
-### contractURI
-
-```solidity
-string contractURI
-```
-
-_Opensea royalty and NFT collection info_
-
-### constructor
-
-```solidity
-constructor(string name, string symbol, string _URI, string _contractURI) public
-```
-
-### tokenURI
-
-```solidity
-function tokenURI(uint256 tokenId) public view virtual returns (string)
-```
-
-_Returns tokenId's token URI. If there is no URI in tokenURIs uses baseURI._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| tokenId | uint256 | - Token ID to check. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | string | string Token URI. |
-
-### nextTokenId
-
-```solidity
-function nextTokenId() external view returns (uint256)
-```
-
-_Returns next token ID to be minted._
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | uint256 | uint256 Token ID. |
-
-### mint
-
-```solidity
-function mint(address recipient, uint256 quantity) external
-```
-
-_Mints a {quantity} of NFTs and sends them to the {recipient}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| recipient | address | - Receiver of NFTs. |
-| quantity | uint256 | - Quantity of NFTs to mint.       Note: This function can only be called by owner. |
-
-### setURIForTokenId
-
-```solidity
-function setURIForTokenId(uint256 tokenId, string _tokenURI) external
-```
-
-_Sets {_tokenURI} for a specified {tokenId}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| tokenId | uint256 | - Token ID to set URI for. |
-| _tokenURI | string | - Token URI.       Note: This function can only be called by owner. |
-
-### setDefaultRoyalty
-
-```solidity
-function setDefaultRoyalty(address receiver, uint96 feeNumerator) external
-```
-
-_Sets default royalty for this collection._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| receiver | address | - Royalty receiver. |
-| feeNumerator | uint96 | - Royalty amount. [10000 == 100%].       Note: This function can only be called by owner. |
-
-### setRoyaltyForTokenId
-
-```solidity
-function setRoyaltyForTokenId(uint256 tokenId, address receiver, uint96 feeNumerator) external
-```
-
-_Sets royalty for a single {tokenId} in the collection._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| tokenId | uint256 | - Token ID to set royalty for. |
-| receiver | address | - Royalty receiver. |
-| feeNumerator | uint96 | - Royalty amount. [10000 == 100%].       Note: This function can only be called by owner. |
-
-### _startTokenId
-
-```solidity
-function _startTokenId() internal pure returns (uint256)
-```
-
-_Returns the starting token ID.
-To change the starting token ID, please override this function._
-
-### _baseURI
-
-```solidity
-function _baseURI() internal view returns (string)
-```
-
-_Base URI for computing {tokenURI}. If set, the resulting URI for each
-token will be the concatenation of the `baseURI` and the `tokenId`. Empty
-by default, it can be overridden in child contracts._
-
-### setApprovalForAll
-
-```solidity
-function setApprovalForAll(address operator, bool approved) public
-```
-
-_Approve or remove `operator` as an operator for the caller.
-Operators can call {transferFrom} or {safeTransferFrom}
-for any token owned by the caller.
-
-Requirements:
-
-- The `operator` cannot be the caller.
-
-Emits an {ApprovalForAll} event._
-
-### approve
-
-```solidity
-function approve(address operator, uint256 tokenId) public payable
-```
-
-### transferFrom
-
-```solidity
-function transferFrom(address from, address to, uint256 tokenId) public payable
-```
-
-_Transfers `tokenId` from `from` to `to`.
-
-Requirements:
-
-- `from` cannot be the zero address.
-- `to` cannot be the zero address.
-- `tokenId` token must be owned by `from`.
-- If the caller is not `from`, it must be approved to move this token
-by either {approve} or {setApprovalForAll}.
-
-Emits a {Transfer} event._
-
-### supportsInterface
-
-```solidity
-function supportsInterface(bytes4 interfaceId) public view returns (bool)
-```
-
-## eeseeNFTDrop
-
-### URI
-
-```solidity
-string URI
-```
-
-_baseURI this contract uses,_
-
-### contractURI
-
-```solidity
-string contractURI
-```
-
-_Opensea royalty and NFT collection info_
-
-### mintLimit
-
-```solidity
-uint256 mintLimit
-```
-
-_Mint cap_
-
-### mintedAmount
-
-```solidity
-uint256 mintedAmount
-```
-
-_Current amount of minted nfts_
-
-### stages
-
-```solidity
-struct IeeseeNFTDrop.SaleStage[] stages
-```
-
-_Info about sale stages_
-
-### constructor
-
-```solidity
-constructor(string name, string symbol, string _URI, string _contractURI, address royaltyReceiver, uint96 royaltyFeeNumerator, uint256 _mintLimit, uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) public
-```
-
-### verifyCanMint
-
-```solidity
-function verifyCanMint(uint8 saleStageIndex, address claimer, bytes32[] merkleProof) public view returns (bool)
-```
-
-_Verifies that a user is in allowlist of saleStageIndex sale stage._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| saleStageIndex | uint8 | - Index of the sale stage. |
-| claimer | address | - Address of a user. |
-| merkleProof | bytes32[] | - Merkle proof of stage's merkle tree. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool true if user in stage's allowlist. |
-
-### getSaleStage
-
-```solidity
-function getSaleStage() public view returns (uint8 index)
-```
-
-_Returns current sale stages index._
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| index | uint8 | - Index of current sale stage. |
-
-### nextTokenId
-
-```solidity
-function nextTokenId() external view returns (uint256)
-```
-
-_Returns next token ID to be minted._
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | uint256 | uint256 Token ID. |
-
-### mint
-
-```solidity
-function mint(address recipient, uint256 quantity, bytes32[] merkleProof) external
-```
-
-_Mints nfts for recipient in the merkle tree._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| recipient | address | - Address of recipient. |
-| quantity | uint256 | - Amount of nfts to mint. |
-| merkleProof | bytes32[] | - Merkle tree proof of transaction sender's address.  Note: This function can only be called by owner. |
-
-### _startTokenId
-
-```solidity
-function _startTokenId() internal pure returns (uint256)
-```
-
-_Returns the starting token ID.
-To change the starting token ID, please override this function._
-
-### _baseURI
-
-```solidity
-function _baseURI() internal view returns (string)
-```
-
-_Base URI for computing {tokenURI}. If set, the resulting URI for each
-token will be the concatenation of the `baseURI` and the `tokenId`. Empty
-by default, it can be overridden in child contracts._
-
-### _setMintStageOptions
-
-```solidity
-function _setMintStageOptions(uint256 mintStartTimestamp, struct IeeseeNFTDrop.StageOptions publicStageOptions, struct IeeseeNFTDrop.StageOptions[] presalesOptions) internal
-```
-
-### setApprovalForAll
-
-```solidity
-function setApprovalForAll(address operator, bool approved) public
-```
-
-_Approve or remove `operator` as an operator for the caller.
-Operators can call {transferFrom} or {safeTransferFrom}
-for any token owned by the caller.
-
-Requirements:
-
-- The `operator` cannot be the caller.
-
-Emits an {ApprovalForAll} event._
-
-### approve
-
-```solidity
-function approve(address operator, uint256 tokenId) public payable
-```
-
-### transferFrom
-
-```solidity
-function transferFrom(address from, address to, uint256 tokenId) public payable
-```
-
-_Transfers `tokenId` from `from` to `to`.
-
-Requirements:
-
-- `from` cannot be the zero address.
-- `to` cannot be the zero address.
-- `tokenId` token must be owned by `from`.
-- If the caller is not `from`, it must be approved to move this token
-by either {approve} or {setApprovalForAll}.
-
-Emits a {Transfer} event._
-
-### supportsInterface
-
-```solidity
-function supportsInterface(bytes4 interfaceId) public view returns (bool)
-```
-
-## eeseePool
-
-### Claim
-
-```solidity
-struct Claim {
-  uint256 rewardID;
-  uint256 balance;
-  bytes32[] merkleProof;
-}
-```
-
-### rewardToken
-
-```solidity
-contract IERC20 rewardToken
-```
-
-_ESE token this contract uses._
-
-### rewardID
-
-```solidity
-uint256 rewardID
-```
-
-_Current reward ID._
-
-### rewardRoot
-
-```solidity
-mapping(uint256 => bytes32) rewardRoot
-```
-
-_Maps {rewardID} to its merkle root._
-
-### isClaimed
-
-```solidity
-mapping(address => mapping(uint256 => bool)) isClaimed
-```
-
-_Has address claimed reward for {rewardID}._
-
-### RewardAdded
-
-```solidity
-event RewardAdded(uint256 rewardID, bytes32 merkleRoot)
-```
-
-### RewardClaimed
-
-```solidity
-event RewardClaimed(uint256 rewardID, address claimer, uint256 amount)
-```
-
-### InvalidMerkleProof
-
-```solidity
-error InvalidMerkleProof()
-```
-
-### AlreadyClaimed
-
-```solidity
-error AlreadyClaimed()
-```
-
-### constructor
-
-```solidity
-constructor(contract IERC20 _rewardToken) public
-```
-
-### claimRewards
-
-```solidity
-function claimRewards(struct eeseePool.Claim[] claims) external
-```
-
-_Claims rewards for multiple {rewardID}s. Emits {RewardClaimed} event for each reward claimed._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| claims | struct eeseePool.Claim[] | - Claim structs. |
-
-### addReward
-
-```solidity
-function addReward(bytes32 merkleRoot) external
-```
-
-_Adds new merkle root and advances to the next {rewardID}. Emits {RewardAdded} event._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| merkleRoot | bytes32 | - Merkle root. |
-
-### getRewards
-
-```solidity
-function getRewards(address claimer, struct eeseePool.Claim[] claims) external view returns (uint256 rewards)
-```
-
-_Verifies {claims} and returns rewards to be claimed from {claims}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| claimer | address | - Address to check. |
-| claims | struct eeseePool.Claim[] | - Claims to check. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| rewards | uint256 | - Rewards to be claimed. |
-
-### verifyClaim
-
-```solidity
-function verifyClaim(address claimer, struct eeseePool.Claim claim) public view returns (bool)
-```
-
-_Verifies {claim} for {claimer}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| claimer | address | - Address to verify claim for. |
-| claim | struct eeseePool.Claim | - Claim to verify. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - Does {claim} exist in merkle root. |
 
 ## UniERC20
 
@@ -2256,501 +2753,12 @@ _router keeps 1 wei of every token on the contract balance for gas optimisations
 | returnAmount | uint256 | Resulting token amount |
 | spentAmount | uint256 | Source token amount |
 
-## ESECrowdsale
-
-_Functionality is adapted from OpenZeppelin's Crowdsale contracts._
-
-### ESE
-
-```solidity
-contract IERC20 ESE
-```
-
-_The token being sold_
-
-### token
-
-```solidity
-contract IERC20 token
-```
-
-_The token being bought_
-
-### wallet
-
-```solidity
-address wallet
-```
-
-_Address where funds are collected_
-
-### rate
-
-```solidity
-uint256 rate
-```
-
-_How many token units a buyer gets per wei.
-        The rate is the conversion between wei and the smallest and indivisible token unit.
-        So, if you are using a rate of 1 with a ERC20Detailed token with 3 decimals called TOK
-        1 wei will give you 1 unit, or 0.001 TOK._
-
-### minSellAmount
-
-```solidity
-uint256 minSellAmount
-```
-
-_Minimum/Maximum amounts of tokens that can be bought by a single account.(in ESE)_
-
-### maxSellAmount
-
-```solidity
-uint256 maxSellAmount
-```
-
-### openingTime
-
-```solidity
-uint256 openingTime
-```
-
-_The time when this crowdsale opens/closes._
-
-### closingTime
-
-```solidity
-uint256 closingTime
-```
-
-### whitelistMerkleRoot
-
-```solidity
-bytes32 whitelistMerkleRoot
-```
-
-_Whitelist Merkle Root. If == bytes32(0) everyone is whitelisted._
+## MockERC20
 
 ### constructor
 
 ```solidity
-constructor(uint256 _rate, address _wallet, contract IERC20 _ESE, contract IERC20 _token, uint256 _minSellAmount, uint256 _maxSellAmount, uint256 _openingTime, uint256 _closingTime, bytes32 _whitelistMerkleRoot) public
-```
-
-### isOpen
-
-```solidity
-function isOpen() public view returns (bool)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - {true} if the crowdsale is open, {false} otherwise. |
-
-### hasClosed
-
-```solidity
-function hasClosed() public view returns (bool)
-```
-
-_Checks whether the period in which the crowdsale is open has already elapsed._
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - Whether crowdsale period has elapsed |
-
-### isWhitelisted
-
-```solidity
-function isWhitelisted(address _address, bytes32[] merkleProof) public view returns (bool)
-```
-
-_Verifies that {_address} is whitelisted. If no {whitelistMerkleRoot} provided, everyone is whitelisted._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _address | address | - Address to verify claim for. |
-| merkleProof | bytes32[] | - Merkle Proof to verify. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - Is whitelisted. |
-
-### buyESE
-
-```solidity
-function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensSpent)
-```
-
-_Buy ESE tokens from this contract. Forwards collected funds to {wallet}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| beneficiary | address | Recipient of the token purchase. |
-| amount | uint256 | Amount of ESE to buy. |
-| merkleProof | bytes32[] | Merkle Proof required for this purchase. |
-
-### changeWallet
-
-```solidity
-function changeWallet(address _wallet) external
-```
-
-_Changes wallet. Emits {ChangeWallet} event._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _wallet | address | - New wallet. Note: This function can only be called by owner. |
-
-### extendTime
-
-```solidity
-function extendTime(uint256 _closingTime) external
-```
-
-_Extend crowdsale._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _closingTime | uint256 | Crowdsale closing time |
-
-## ESE
-
-### presale
-
-```solidity
-contract IESECrowdsale presale
-```
-
-_Presale contract._
-
-### presaleStart
-
-```solidity
-uint256 presaleStart
-```
-
-_Presale start timestamp._
-
-### presaleUnlockTime
-
-```solidity
-uint256 presaleUnlockTime
-```
-
-_Time in which tokens will be unlocked._
-
-### privateSale
-
-```solidity
-contract IESECrowdsale privateSale
-```
-
-_Private sale contract._
-
-### privateSaleStart
-
-```solidity
-uint256 privateSaleStart
-```
-
-_Presale start timestamp._
-
-### privateSalePeriods
-
-```solidity
-uint256 privateSalePeriods
-```
-
-_Periods over which tokens will be unlocked._
-
-### privateSalePeriodTime
-
-```solidity
-uint256 privateSalePeriodTime
-```
-
-_Duration of each period._
-
-### lockPrivateSale
-
-```solidity
-bool lockPrivateSale
-```
-
-_False if ignore lock mechanism on private sales_
-
-### InvalidAmount
-
-```solidity
-error InvalidAmount()
-```
-
-### InvalidCrowdsale
-
-```solidity
-error InvalidCrowdsale()
-```
-
-### TransferingLockedTokens
-
-```solidity
-error TransferingLockedTokens(uint256 tokensLocked)
-```
-
-### constructor
-
-```solidity
-constructor(uint256 amount, uint256 _presaleAmount, contract IESECrowdsale _presale, uint256 _presaleUnlockTime, uint256 _privateSaleAmount, contract IESECrowdsale _privateSale, uint256 _privateSalePeriods, uint256 _privateSalePeriodTime) public
-```
-
-### lockedAmount
-
-```solidity
-function lockedAmount(address _address) external view returns (uint256)
-```
-
-_Returns locked tokens for an {_address}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _address | address | - Address to check. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | uint256 | uint256 - Amount of tokens locked. |
-
-### available
-
-```solidity
-function available(address _address) external view returns (uint256)
-```
-
-_Returns tokens available for an {_address} to transfer._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _address | address | - Address to check. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | uint256 | uint256 - Amount of tokens available. |
-
-### _beforeTokenTransfer
-
-```solidity
-function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual
-```
-
-_Hook that is called before any transfer of tokens. This includes
-minting and burning.
-
-Calling conditions:
-
-- when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
-will be transferred to `to`.
-- when `from` is zero, `amount` tokens will be minted for `to`.
-- when `to` is zero, `amount` of ``from``'s tokens will be burned.
-- `from` and `to` are never both zero.
-
-To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks]._
-
-## IESECrowdsale
-
-### TokensPurchased
-
-```solidity
-event TokensPurchased(address purchaser, address beneficiary, uint256 value, uint256 amount)
-```
-
-### ChangeWallet
-
-```solidity
-event ChangeWallet(address previousWallet, address newWallet)
-```
-
-### TimedCrowdsaleExtended
-
-```solidity
-event TimedCrowdsaleExtended(uint256 previousClosingTime, uint256 newClosingTime)
-```
-
-### AlreadyClosed
-
-```solidity
-error AlreadyClosed(uint256 closingTime)
-```
-
-### NotOpen
-
-```solidity
-error NotOpen()
-```
-
-### NotWhitelisted
-
-```solidity
-error NotWhitelisted()
-```
-
-### InvalidBeneficiary
-
-```solidity
-error InvalidBeneficiary()
-```
-
-### InvalidRate
-
-```solidity
-error InvalidRate()
-```
-
-### InvalidWallet
-
-```solidity
-error InvalidWallet()
-```
-
-### InvalidESE
-
-```solidity
-error InvalidESE()
-```
-
-### InvalidOpeningTime
-
-```solidity
-error InvalidOpeningTime()
-```
-
-### InvalidClosingTime
-
-```solidity
-error InvalidClosingTime()
-```
-
-### InvalidToken
-
-```solidity
-error InvalidToken()
-```
-
-### InvalidMaxSellAmount
-
-```solidity
-error InvalidMaxSellAmount()
-```
-
-### SellAmountTooHigh
-
-```solidity
-error SellAmountTooHigh(uint256 maxSellAmount)
-```
-
-### SellAmountTooLow
-
-```solidity
-error SellAmountTooLow(uint256 minSellAmount)
-```
-
-### MinSellAmountTooHigh
-
-```solidity
-error MinSellAmountTooHigh(uint256 cap)
-```
-
-### ESE
-
-```solidity
-function ESE() external view returns (contract IERC20)
-```
-
-### token
-
-```solidity
-function token() external view returns (contract IERC20)
-```
-
-### wallet
-
-```solidity
-function wallet() external view returns (address)
-```
-
-### rate
-
-```solidity
-function rate() external view returns (uint256)
-```
-
-### minSellAmount
-
-```solidity
-function minSellAmount() external view returns (uint256)
-```
-
-### maxSellAmount
-
-```solidity
-function maxSellAmount() external view returns (uint256)
-```
-
-### openingTime
-
-```solidity
-function openingTime() external view returns (uint256)
-```
-
-### whitelistMerkleRoot
-
-```solidity
-function whitelistMerkleRoot() external view returns (bytes32)
-```
-
-### isOpen
-
-```solidity
-function isOpen() external view returns (bool)
-```
-
-### isWhitelisted
-
-```solidity
-function isWhitelisted(address _address, bytes32[] merkleProof) external view returns (bool)
-```
-
-### buyESE
-
-```solidity
-function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensBought)
-```
-
-### changeWallet
-
-```solidity
-function changeWallet(address _wallet) external
+constructor(uint256 amount) public
 ```
 
 ## MockESECrowdsale
@@ -2773,19 +2781,58 @@ constructor() public
 function transfer(contract IERC20 token, address to, uint256 amount) external
 ```
 
-## MockERC20
-
-### constructor
-
-```solidity
-constructor(uint256 amount) public
-```
-
 ## MockRoyaltyEngine
 
 ### getRoyalty
 
 ```solidity
 function getRoyalty(address tokenAddress, uint256 tokenId, uint256 value) public view returns (address payable[] recipients, uint256[] amounts)
+```
+
+## MockVRFCoordinator
+
+### VRF
+
+```solidity
+struct VRF {
+  contract VRFConsumerBaseV2 consumer;
+  uint32 callbackGasLimit;
+}
+```
+
+### counter
+
+```solidity
+uint256 counter
+```
+
+### vrf
+
+```solidity
+mapping(uint256 => struct MockVRFCoordinator.VRF) vrf
+```
+
+### requestRandomWords
+
+```solidity
+function requestRandomWords(bytes32, uint64, uint16, uint32 callbackGasLimit, uint32) external returns (uint256)
+```
+
+### fulfillWords
+
+```solidity
+function fulfillWords(uint256 requestId) external
+```
+
+### createSubscription
+
+```solidity
+function createSubscription() external returns (uint64 subscriptionID)
+```
+
+### addConsumer
+
+```solidity
+function addConsumer(uint64, address) external
 ```
 
