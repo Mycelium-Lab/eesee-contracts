@@ -279,7 +279,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @return ticketsBought - Tickets bought.
      */
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external nonReentrant payable returns(uint256 tokensSpent, uint256 ticketsBought){
-        (address executor,IAggregationRouterV5.SwapDescription memory desc, bytes memory permit, bytes memory data) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes, bytes));
+        (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
         if(
             bytes4(swapData[:4]) != IAggregationRouterV5.swap.selector || 
             desc.srcToken == ESE || 
@@ -295,8 +295,13 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             desc.srcToken.transferFrom(msg.sender, address(this), desc.amount);
             desc.srcToken.approve(OneInchRouter, desc.amount);
         }
+
         uint256 returnAmount;
-        (returnAmount, tokensSpent) = IAggregationRouterV5(OneInchRouter).swap{value: msg.value}(executor, desc, permit, data);
+        {
+        (bool success, bytes memory data) = OneInchRouter.call{value: msg.value}(swapData);
+        if(!success) revert SwapNotSuccessful();
+        (returnAmount, tokensSpent) = abi.decode(data, (uint256, uint256));
+        }
 
         Listing storage listing = listings[ID];
         ticketsBought = returnAmount / listing.ticketPrice;
