@@ -284,6 +284,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             bytes4(swapData[:4]) != IAggregationRouterV5.swap.selector || 
             desc.srcToken == ESE || 
             desc.dstToken != ESE || 
+            desc.amount == 0 ||
             desc.dstReceiver != address(this)
         ) revert InvalidSwapDescription();
 
@@ -292,7 +293,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             if(msg.value != desc.amount) revert InvalidMsgValue();
         }else{
             if(msg.value != 0) revert InvalidMsgValue();
-            desc.srcToken.transferFrom(msg.sender, address(this), desc.amount);
+            desc.srcToken.safeTransferFrom(msg.sender, address(this), desc.amount);
             desc.srcToken.approve(OneInchRouter, desc.amount);
         }
 
@@ -310,14 +311,14 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         // Refund dust
         uint256 ESEPaid = ticketsBought * listing.ticketPrice;
         if(returnAmount > ESEPaid){
-            ESE.transfer(address(msg.sender), returnAmount - ESEPaid); 
+            ESE.safeTransfer(address(msg.sender), returnAmount - ESEPaid); 
         }
         if(desc.amount > tokensSpent){
             if(isETH){
                 (bool success, ) = msg.sender.call{value: desc.amount - tokensSpent, gas: 5000}("");
                 if(!success) revert TransferNotSuccessful();
             }else{
-                desc.srcToken.transfer(address(msg.sender), desc.amount - tokensSpent);
+                desc.srcToken.safeTransfer(address(msg.sender), desc.amount - tokensSpent);
             }   
         }
     }
