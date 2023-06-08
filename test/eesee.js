@@ -677,7 +677,7 @@ const {
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 211}))//
         .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
 
-        swapData = iface.encodeFunctionData('swap', [//TODO:check eth transfer
+        swapData = iface.encodeFunctionData('swap', [
             mock1InchExecutor.address, 
             {
                 srcToken: zeroAddress,

@@ -333,5 +333,5 @@ interface Ieesee {
     function changeFee(uint256 _fee) external;
     function changeFeeCollector(address _feeCollector) external;
 
-    function fund(uint96 amount) external;
+    function fund(uint96 amount) external payable;
 }

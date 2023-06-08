@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/Ieesee.sol";
+import "./interfaces/IAnyCallConfig.sol";
 
 contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -53,6 +54,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     ///@dev 1inch router used for token swaps.
     address immutable public OneInchRouter;
 
+    ///@dev Multichain's anycall config
+    IAnycallConfig immutable public AnyCallConfig;
+
     receive() external payable {
         //Reject deposits from EOA
         if (msg.sender == tx.origin) revert EthDepositRejected();
@@ -68,7 +72,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         bytes32 _keyHash,
         uint16 _minimumRequestConfirmations,
         uint32 _callbackGasLimit,
-        address _OneInchRouter
+        address _OneInchRouter,
+        IAnycallConfig _AnyCallConfig
     ) VRFConsumerBaseV2(_vrfCoordinator) {
         ESE = _ESE;
         minter = _minter;
@@ -85,6 +90,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         callbackGasLimit = _callbackGasLimit;
 
         OneInchRouter = _OneInchRouter;
+        AnyCallConfig = _AnyCallConfig;
 
         //Create dummy listings at index 0
         listings.push();
@@ -624,6 +630,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         if(listing.ticketsBought > listing.maxTickets) revert AllTicketsBought();
 
         if(listing.ticketsBought == listing.maxTickets){
+            //TODO: redo with multichain in mind
             uint256 requestID = vrfCoordinator.requestRandomWords(keyHash, subscriptionID, minimumRequestConfirmations, callbackGasLimit, 1);
             chainlinkRequestIDs[requestID] = ID;
             emit RequestWords(ID, requestID);
@@ -729,12 +736,15 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @dev Fund function for Chainlink's VRF V2 subscription.
      * @param amount - Amount of LINK to fund subscription with.
      */
-    function fund(uint96 amount) external {
-        IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), amount);
-        LINK.transferAndCall(
-            address(vrfCoordinator),
-            amount,
-            abi.encode(subscriptionID)
-        );
+    function fund(uint96 amount) external payable {
+        if(amount > 0){
+            IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), amount);
+            LINK.transferAndCall(
+                address(vrfCoordinator),
+                amount,
+                abi.encode(subscriptionID)
+            );
+        }
+        AnyCallConfig.deposit{value: msg.value}(address(this));
     }
 }
