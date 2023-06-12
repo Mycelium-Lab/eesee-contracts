@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/Ieesee.sol";
+import "./interfaces/IUniswapV2Router01.sol";
 
 contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -43,6 +44,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     uint64 immutable public subscriptionID;
     ///@dev Chainlink VRF V2 key hash to call requestRandomWords() with.
     bytes32 immutable public keyHash;
+    ///@dev Chainlink VRF V2 gas lane to call requestRandomWords() with unhashed.
+    uint256 immutable public keyHashGasLane;
     ///@dev Chainlink VRF V2 request confirmations.
     uint16 immutable public minimumRequestConfirmations;
     ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
@@ -50,6 +53,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
     ///@dev The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract.
     IRoyaltyEngineV1 immutable public royaltyEngine;
+    ///@dev UniswapV2 router is used for ETH => LINK conversions. We use UniswapV2 with predefined {route} to have as little contol over ETH as possible.
+    IUniswapV2Router01 immutable public UniswapV2Router;
+    address[] public route;
+
     ///@dev 1inch router used for token swaps.
     address immutable public OneInchRouter;
 
@@ -64,10 +71,13 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         address _feeCollector,
         IRoyaltyEngineV1 _royaltyEngine,
         address _vrfCoordinator, 
+        address _WETH,
         LinkTokenInterface _LINK,
         bytes32 _keyHash,
+        uint256 _keyHashGasLane,
         uint16 _minimumRequestConfirmations,
         uint32 _callbackGasLimit,
+        IUniswapV2Router01 _UniswapV2Router,
         address _OneInchRouter
     ) VRFConsumerBaseV2(_vrfCoordinator) {
         ESE = _ESE;
@@ -81,8 +91,14 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         vrfCoordinator.addConsumer(subscriptionID, address(this));
         LINK = _LINK;
         keyHash = _keyHash;
+        keyHashGasLane = _keyHashGasLane;
         minimumRequestConfirmations = _minimumRequestConfirmations;
         callbackGasLimit = _callbackGasLimit;
+
+        UniswapV2Router = _UniswapV2Router;
+        route = new address[](2);
+        route[0] = _WETH;
+        route[1] = address(LINK);
 
         OneInchRouter = _OneInchRouter;
 
@@ -265,7 +281,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      
      * @return tokensSpent - ESE tokens spent.
      */
-    function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent){
+    function buyTickets(uint256 ID, uint256 amount) external payable returns(uint256 tokensSpent){
+        if(msg.value != chainlinkCostPerTicket(amount)) revert InvalidMsgValue();
         tokensSpent = _buyTickets(ID, amount);
         ESE.safeTransferFrom(msg.sender, address(this), tokensSpent);
     }
@@ -278,6 +295,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @return tokensSpent - Tokens spent.
      * @return ticketsBought - Tickets bought.
      */
+     //todo: add _chainlinkCostPerTicket()
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external nonReentrant payable returns(uint256 tokensSpent, uint256 ticketsBought){
         (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
         if(
@@ -539,6 +557,18 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     }
 
     // ============ Getters ============
+    //TODO: return that amount if listing is cancelled, return amount if overpaid
+    /**
+     * @dev Additional ETH that needs to be passed with buyTickets to pay for Chainlink gas costs.
+     * @param maxTickets - Amount of tickets to divide chainlink call cost.
+
+     *@return ETHPerTicket - ETH gas amount that has to be paid for each ticket bought.
+     */
+     //TODO: use only half
+    function chainlinkCostPerTicket(uint256 maxTickets) public view returns(uint256 ETHPerTicket){
+        uint256 maxETHCost = keyHashGasLane * (200000 + callbackGasLimit);//200000 is Verification gas
+        ETHPerTicket = maxETHCost / maxTickets;
+    }
 
     /**
      * @dev Get length of the listings array.
@@ -728,9 +758,22 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     /**
      * @dev Fund function for Chainlink's VRF V2 subscription.
      * @param amount - Amount of LINK to fund subscription with.
+     * @param amountOutMin - Min amount of Chainlink that can be received from swap.
      */
-    function fund(uint96 amount) external {
-        IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), amount);
+    function fund(uint256 _amount, uint256 amountOutMin) external returns (uint96 amount){
+        if(_amount > 0){
+            IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), _amount);
+        }
+        
+        uint256 balance = address(this).balance;
+        if(balance > 0){
+            uint256[] memory amounts = UniswapV2Router.swapExactETHForTokens{value: balance}(amountOutMin, route, address(this), block.timestamp);
+            _amount += amounts[1];
+        }
+
+        if(_amount == 0 || _amount > type(uint96).max) revert InvalidAmount();
+        amount = uint96(_amount);
+
         LINK.transferAndCall(
             address(vrfCoordinator),
             amount,

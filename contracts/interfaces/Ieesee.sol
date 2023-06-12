@@ -205,6 +205,7 @@ interface Ieesee {
     error SwapNotSuccessful();
     error TransferNotSuccessful();
     error EthDepositRejected();
+    error InvalidAmount();
 
     function listings(uint256) external view returns(
         uint256 ID,
@@ -299,7 +300,7 @@ interface Ieesee {
         uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs);
 
-    function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent);
+    function buyTickets(uint256 ID, uint256 amount) external payable returns(uint256 tokensSpent);
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external payable returns(uint256 tokensSpent, uint256 ticketsBought);
 
     function listDrop(
@@ -323,6 +324,7 @@ interface Ieesee {
     function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs);
     function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
+    function chainlinkCostPerTicket(uint256 maxTickets) external view returns(uint256 ETHPerTicket);
     function getListingsLength() external view returns(uint256 length);
     function getListingTicketIDBuyer(uint256 ID, uint256 ticket) external view returns(address);
     function getListingTicketsBoughtByAddress(uint256 ID, address _address) external view returns(uint256);
@@ -333,5 +335,5 @@ interface Ieesee {
     function changeFee(uint256 _fee) external;
     function changeFeeCollector(address _feeCollector) external;
 
-    function fund(uint96 amount) external;
+    function fund(uint256 _amount, uint256 amountOutMin) external returns (uint96 amount);
 }
