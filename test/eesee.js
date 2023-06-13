@@ -19,6 +19,7 @@ const {
     let royaltyEninge;
     let mock1InchExecutor
     let mock1InchRouter
+    let mockUniswapV2Router
     //after one year
     const zeroAddress = "0x0000000000000000000000000000000000000000"
     const oneAddress = "0x0000000000000000000000000000000000000001"
@@ -35,6 +36,7 @@ const {
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
         const _mock1InchExecutor = await hre.ethers.getContractFactory("Mock1InchExecutor");
         const _mock1InchRouter = await hre.ethers.getContractFactory("Mock1InchRouter");
+        const _mockUniswapV2Router = await hre.ethers.getContractFactory("MockUniswapV2Router");
         const _privateSale = await hre.ethers.getContractFactory('ESECrowdsale')
 
         const mockPresale = await _privateSale.deploy(125000000000000, oneAddress, oneAddress, oneAddress, 1000000000, 200000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
@@ -73,6 +75,9 @@ const {
         await ESE.transfer(mock1InchExecutor.address, '1000000000000000000000000')
         await ERC20.transfer(mock1InchExecutor.address, '1000000000000000000000000')
 
+        mockUniswapV2Router = await _mockUniswapV2Router.deploy(ESE.address);
+        await ESE.transfer(mockUniswapV2Router.address, '10000000000000000000000')
+
         mock1InchRouter = await _mock1InchRouter.deploy();
         await mock1InchRouter.deployed()
 
@@ -81,11 +86,16 @@ const {
             minter.address, 
             feeCollector.address, 
             royaltyEninge.address, 
-            mockVRF.address,
-            zeroAddress,//ChainLink token
-            '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
-            0,//minimumRequestConfirmations
-            50000,//callbackGasLimit
+            {
+                vrfCoordinator: mockVRF.address,
+                LINK: zeroAddress,
+                keyHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                keyHashGasLane: 200000000000,
+                minimumRequestConfirmations: 0,
+                callbackGasLimit: 50000
+            },
+            ERC20.address,
+            mockUniswapV2Router.address,
             mock1InchRouter.address
         )
         await eesee.deployed()
@@ -226,12 +236,15 @@ const {
 
     it('Buys tickets', async () => {
         const ID = 1
-        await expect(eesee.connect(acc2).buyTickets(ID, 0)).to.be.revertedWithCustomError(eesee, "BuyAmountTooLow")
-        await expect(eesee.connect(acc2).buyTickets(0, 1)).to.be.revertedWithCustomError(eesee, "ListingNotExists").withArgs(0);
-        await expect(eesee.connect(acc2).buyTickets(ID, 21)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address);
+        await expect(eesee.connect(acc2).buyTickets(ID, 0, {value: 0})).to.be.revertedWithCustomError(eesee, "BuyAmountTooLow")
+        await expect(eesee.connect(acc2).buyTickets(0, 1, {value: 0})).to.be.revertedWithCustomError(eesee, "ListingNotExists").withArgs(0);
+        chainlinkCost = await eesee.ChainlinkFee(ID, 21)
+        await expect(eesee.connect(acc2).buyTickets(ID, 21, {value: chainlinkCost})).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address);
+        await expect(eesee.connect(acc2).buyTickets(ID, 21, {value: 0})).to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
 
         const balanceBefore = await ESE.balanceOf(acc2.address)
-        const recipt = expect(eesee.connect(acc2).buyTickets(ID, 20))
+        chainlinkCost = await eesee.ChainlinkFee(ID, 20)
+        const recipt = expect(eesee.connect(acc2).buyTickets(ID, 20, {value: chainlinkCost}))
         for (let i = 0; i < 20; i++) {
             await recipt.to.emit(eesee, "BuyTicket").withArgs(ID, acc2.address, i, 2)
 
@@ -245,7 +258,8 @@ const {
         const balanceAfter = await ESE.balanceOf(acc2.address)
         assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
 
-        await expect(eesee.connect(acc2).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address)
+        chainlinkCost = await eesee.ChainlinkFee(ID, 1)
+        await expect(eesee.connect(acc2).buyTickets(ID, 1, {value: chainlinkCost})).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(acc2.address)
 
         const listing = await eesee.listings(ID);
         assert.equal(listing.ticketsBought, 20, "ticketsBought is correct")
@@ -255,7 +269,8 @@ const {
         const ID = 1
         for (let i = 1; i <= 4; i++) {
             const balanceBefore = await ESE.balanceOf(ticketBuyers[i].address)
-            const recipt = expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 20))
+            let chainlinkCost = await eesee.ChainlinkFee(ID, 20)
+            const recipt = expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 20, {value: chainlinkCost}))
             for (let j = i * 20; j < (i + 1) * 20; j++) {
                 await recipt.to.emit(eesee, "BuyTicket").withArgs(ID, ticketBuyers[i].address, j, 2)
 
@@ -268,8 +283,8 @@ const {
 
             const balanceAfter = await ESE.balanceOf(ticketBuyers[i].address)
             assert.equal(BigInt(balanceBefore) - BigInt(balanceAfter), 20*2, "Price paid is correct")
-
-            await expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(ticketBuyers[i].address)
+            chainlinkCost = await eesee.ChainlinkFee(ID, 1)
+            await expect(eesee.connect(ticketBuyers[i]).buyTickets(ID, 1, {value: chainlinkCost})).to.be.revertedWithCustomError(eesee, "MaxTicketsBoughtByAddress").withArgs(ticketBuyers[i].address)
 
             const listing = await eesee.listings(ID);
             assert.equal(listing.ticketsBought, (i + 1)*20, "ticketsBought is correct")
@@ -292,12 +307,13 @@ const {
 
         //buy tickets for listing that will expire
         const expiredListingID = 2
-        const buyTicketsForExpiredReceipt = expect(eesee.connect(acc7).buyTickets(expiredListingID, 5))
+        chainlinkCost = await eesee.ChainlinkFee(expiredListingID, 5)
+        const buyTicketsForExpiredReceipt = expect(eesee.connect(acc7).buyTickets(expiredListingID, 5, {value: chainlinkCost}))
         for(let i = 0; i < 5; i ++) {
             await buyTicketsForExpiredReceipt.to.emit(eesee, "BuyTicket").withArgs(expiredListingID, acc7.address, i, 3)
         }
-        
-        await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1)).to.be.revertedWithCustomError(eesee, "AllTicketsBought")
+        chainlinkCost = await eesee.ChainlinkFee(ID, 1)
+        await expect(eesee.connect(ticketBuyers[5]).buyTickets(ID, 1, {value: chainlinkCost})).to.be.revertedWithCustomError(eesee, "AllTicketsBought")
     })
 
     it('Selects winner', async () => {
@@ -359,7 +375,8 @@ const {
     it('buyTickets reverts if listing is expired', async () => {
         const IDs = [2,3,4]
 
-        await eesee.connect(acc2).buyTickets(IDs[2], 20)
+        let chainlinkCost = await eesee.ChainlinkFee(IDs[2], 20)
+        await eesee.connect(acc2).buyTickets(IDs[2], 20, {value: chainlinkCost})
 
         const timestampBeforeTimeSkip = (await ethers.provider.getBlock()).timestamp
         await time.increase(86401)
@@ -367,8 +384,10 @@ const {
         const listing = await eesee.listings(IDs[0])
         assert.equal(timestampBeforeTimeSkip, timestampAfterTimeSkip-86401, "timetravel is successfull")
         assert.equal((listing.creationTime.add(listing.duration)).lt(timestampAfterTimeSkip), true, "listing expired")
-        await expect(eesee.connect(acc2).buyTickets(IDs[0], 20)).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[0])
-        await expect(eesee.connect(acc2).buyTickets(IDs[1], 20)).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[1])
+        chainlinkCost = await eesee.ChainlinkFee(IDs[0], 20)
+        await expect(eesee.connect(acc2).buyTickets(IDs[0], 20, {value: chainlinkCost})).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[0])
+        chainlinkCost = await eesee.ChainlinkFee(IDs[1], 20)
+        await expect(eesee.connect(acc2).buyTickets(IDs[1], 20, {value: chainlinkCost})).to.be.revertedWithCustomError(eesee, "ListingExpired").withArgs(IDs[1])
     })
     it('Can reclaim tokens if listing is expired', async () => {
         const expiredListingID = 2
@@ -444,7 +463,8 @@ const {
         assert.equal(royaltyInfoForListing3[1].toString(), "15", `royaltyInfo for ${currentListingID + 3} is correct`)
         
         for(let i = 0; i < 5; i ++){
-            await expect(eesee.connect(ticketBuyers[i]).buyTickets(currentListingID, 2))
+            let chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
+            await expect(eesee.connect(ticketBuyers[i]).buyTickets(currentListingID, 2, {value: chainlinkCost}))
             .to.emit(eesee, "BuyTicket").withArgs(currentListingID, ticketBuyers[i].address, i*2, 10)
         }
        
@@ -514,7 +534,8 @@ const {
         assert.equal(royaltyInfoForListing2[1].toString(), "3", `royaltyInfo for ${currentListingID + 1} is correct`)
         assert.equal(royaltyInfoForListing3[1].toString(), "3", `royaltyInfo for ${currentListingID + 2} is correct`)
         for(let i = 0; i < 5; i ++){
-            await expect(eesee.connect(ticketBuyers[i]).buyTickets(currentListingID, 1))
+            let chainlinkCost = await eesee.ChainlinkFee(currentListingID, 1)
+            await expect(eesee.connect(ticketBuyers[i]).buyTickets(currentListingID, 1, {value: chainlinkCost}))
             .to.emit(eesee, "BuyTicket").withArgs(currentListingID, ticketBuyers[i].address, i, 30)
         }
        
@@ -561,7 +582,8 @@ const {
             '0x00',
             '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
-        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        let chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: chainlinkCost}))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
 
         swapData = iface.encodeFunctionData('swap', [
@@ -578,7 +600,8 @@ const {
             '0x00',
             '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
-        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: chainlinkCost}))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
 
         swapData = iface.encodeFunctionData('swap', [
@@ -595,7 +618,8 @@ const {
             '0x00',
             '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
-        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: chainlinkCost}))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
 
         swapData = iface.encodeFunctionData('swep', [//
@@ -612,6 +636,7 @@ const {
             '0x00',
             '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
+        chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
         .to.be.revertedWithCustomError(eesee, "InvalidSwapDescription")
 
@@ -629,6 +654,7 @@ const {
             '0x00',
             '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
+        chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 1}))//
         .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
 
@@ -650,7 +676,8 @@ const {
         const balanceBefore = await ESE.balanceOf(signer.address)
         const balanceBefore_ = await ERC20.balanceOf(signer.address)
 
-        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData))
+        chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
+        await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: chainlinkCost }))
             .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 0, 50)
             .to.emit(eesee, "BuyTicket").withArgs(currentListingID, signer.address, 1, 50)
 
@@ -674,6 +701,7 @@ const {
             '0x00',
             '0x000000000000000000000000' + ERC20.address.substring(2)
         ])
+        chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
         await expect(eesee.connect(signer).buyTicketsWithSwap(currentListingID, swapData, {value: 211}))//
         .to.be.revertedWithCustomError(eesee, "InvalidMsgValue")
 
@@ -695,7 +723,8 @@ const {
         const _balanceBefore = await ESE.balanceOf(acc9.address)
         const _balanceBefore_ = await ethers.provider.getBalance(acc9.address);
 
-        const tx = await eesee.connect(acc9).buyTicketsWithSwap(currentListingID, swapData, {value: 64})
+        chainlinkCost = await eesee.ChainlinkFee(currentListingID, 2)
+        const tx = await eesee.connect(acc9).buyTicketsWithSwap(currentListingID, swapData, {value: chainlinkCost + 64})
         const rr = await tx.wait()
         await expect(tx)
             .to.emit(eesee, "BuyTicket").withArgs(currentListingID, acc9.address, 2, 50)
@@ -705,7 +734,7 @@ const {
         const _balanceAfter_ = await ethers.provider.getBalance(acc9.address);
 
         assert.equal(_balanceAfter.sub(_balanceBefore).toString(), "8", 'ESE balance is correct')
-        assert.equal(_balanceBefore_.sub(_balanceAfter_).sub(rr.gasUsed.mul(rr.effectiveGasPrice)).toString(), "55", 'ERC20 balance is correct')
+        assert.equal(_balanceBefore_.sub(_balanceAfter_).sub(chainlinkCost).sub(rr.gasUsed.mul(rr.effectiveGasPrice)).toString(), "55", 'ERC20 balance is correct')
     })
 
     it('Changes constants', async () => {
@@ -894,4 +923,5 @@ const {
         expectedReceive = BigInt(ethers.utils.parseUnits('0.06', 'ether')) - expectedFee
         assert.equal(BigInt(collectorBalanceAfter) - BigInt(collectorBalanceBefore), expectedReceive, "Amount collected is correct")
     })
+    //TODO: fund check
 });

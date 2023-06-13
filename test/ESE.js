@@ -4,7 +4,7 @@ const {
 const { expect } = require('chai')
 const { ethers, network } = require('hardhat')
 const assert = require('assert')
-describe('eesee', function () {
+describe('ESE', function () {
   let ESE, mockPrivateSale, mockPresale
   let signer, acc2, acc3, acc4, acc5, acc6
   let snapshotId, snapshotId2, snapshotId3

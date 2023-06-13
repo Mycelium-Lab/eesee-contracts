@@ -277,10 +277,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @param amount - Amount of tickets to buy. A single address can't buy more than {maxTicketsBoughtByAddress} of all tickets. 
      
      * @return tokensSpent - ESE tokens spent.
-        Note: {chainlinkCostPerTicket(ID)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
+        Note: {ChainlinkFee(ID, amount)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
      */
     function buyTickets(uint256 ID, uint256 amount) external payable returns(uint256 tokensSpent){
-        if(msg.value != chainlinkCostPerTicket(ID)) revert InvalidMsgValue();
+        if(msg.value != ChainlinkFee(ID, amount)) revert InvalidMsgValue();
         tokensSpent = _buyTickets(ID, amount);
         ESE.safeTransferFrom(msg.sender, address(this), tokensSpent);
     }
@@ -292,7 +292,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      
      * @return tokensSpent - Tokens spent.
      * @return ticketsBought - Tickets bought.
-        Note: Additionaly {chainlinkCostPerTicket(ID)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
+        Note: Additionaly {ChainlinkFee(ID, amount)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
      */
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external nonReentrant payable returns(uint256 tokensSpent, uint256 ticketsBought){
         (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
@@ -305,17 +305,18 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         ) revert InvalidSwapDescription();
 
         bool isETH = (address(desc.srcToken) == address(0) || address(desc.srcToken) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        uint256 value; 
         if(isETH){
-            if(msg.value != desc.amount + chainlinkCostPerTicket(ID)) revert InvalidMsgValue();
+            if(msg.value < desc.amount) revert InvalidMsgValue();
+            value = desc.amount;
         }else{
-            if(msg.value != chainlinkCostPerTicket(ID)) revert InvalidMsgValue();
             desc.srcToken.safeTransferFrom(msg.sender, address(this), desc.amount);
             desc.srcToken.approve(OneInchRouter, desc.amount);
         }
 
         uint256 returnAmount;
         {
-        (bool success, bytes memory data) = OneInchRouter.call{value: msg.value}(swapData);
+        (bool success, bytes memory data) = OneInchRouter.call{value: value}(swapData);
         if(!success) revert SwapNotSuccessful(); 
         (returnAmount, tokensSpent) = abi.decode(data, (uint256, uint256));
         }
@@ -324,11 +325,20 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         ticketsBought = returnAmount / listing.ticketPrice;
         _buyTickets(ID, ticketsBought);
 
-        // Refund dust
+        // Refund ESE dust
         uint256 ESEPaid = ticketsBought * listing.ticketPrice;
         if(returnAmount > ESEPaid){
             ESE.safeTransfer(address(msg.sender), returnAmount - ESEPaid); 
         }
+        // Refund chainlink fee
+        value += ChainlinkFee(ID, ticketsBought);
+        if(msg.value < value) {
+            revert InvalidMsgValue();
+        } else {
+            (bool success, ) = msg.sender.call{value: msg.value - value}("");
+            if(!success) revert TransferNotSuccessful();
+        }
+        // Refund srcToken dust
         if(desc.amount > tokensSpent){
             if(isETH){
                 (bool success, ) = msg.sender.call{value: desc.amount - tokensSpent}("");
@@ -548,7 +558,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
             emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
 
-            uint256 chainlinkFeeRefund = chainlinkCostPerTicket(ID);
+            uint256 chainlinkFeeRefund = ChainlinkFee(ID, ticketsBoughtByAddress);
             if(listing.ticketsBought == 0 && listing.itemClaimed) delete listings[ID];
 
             (bool success, ) = msg.sender.call{value: chainlinkFeeRefund}("");
@@ -562,12 +572,17 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     /**
      * @dev Additional ETH that needs to be passed with buyTickets to pay for Chainlink gas costs.
      * @param ID - ID of listing to check.
+     * @param amount - Amount of tickets to buy.
 
-     *@return ETHPerTicket - ETH gas amount that has to be paid for each ticket bought.
+     * @return uint256 - ETH gas amount that has to be paid for {amount} of tickets bought.
      */
-    function chainlinkCostPerTicket(uint256 ID) public view returns(uint256 ETHPerTicket){
-        uint256 maxETHCost = keyHashGasLane * (200000 + callbackGasLimit); // 200000 is Verification gas
-        ETHPerTicket = maxETHCost * chainlinkFeeShare / listings[ID].maxTickets / denominator;
+    function ChainlinkFee(uint256 ID, uint256 amount) public view returns(uint256){
+        uint256 maxTickets = listings[ID].maxTickets;
+        if(maxTickets == 0) revert ListingNotExists(ID);
+        
+        uint256 maxETH = keyHashGasLane * (200000 + callbackGasLimit); // 200000 is Verification gas
+        // Total cost is maxETH * chainlinkFeeShare * (amount / maxTickets)
+        return maxETH * chainlinkFeeShare * amount / maxTickets / denominator;
     }
 
     /**

@@ -341,7 +341,7 @@ interface Ieesee {
     function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs);
     function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
-    function chainlinkCostPerTicket(uint256 maxTickets) external view returns(uint256 ETHPerTicket);
+    function ChainlinkFee(uint256 ID, uint256 amount) external view returns(uint256);
     function getListingsLength() external view returns(uint256 length);
     function getListingTicketIDBuyer(uint256 ID, uint256 ticket) external view returns(address);
     function getListingTicketsBoughtByAddress(uint256 ID, address _address) external view returns(uint256);

@@ -129,11 +129,16 @@ const {
             minter.address, 
             feeCollector.address, 
             royaltyEninge.address, 
-            mockVRF.address,
-            zeroAddress,//ChainLink token
-            '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
-            0,//minimumRequestConfirmations
-            50000,//callbackGasLimit
+            {
+                vrfCoordinator: mockVRF.address,
+                LINK: zeroAddress,
+                keyHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                keyHashGasLane: 200000000000,
+                minimumRequestConfirmations: 0,
+                callbackGasLimit: 50000
+            },
+            '0x0000000000000000000000000000000000000000',//Weth, does not matter in this test
+            '0x0000000000000000000000000000000000000000',//uniswap, does not matter in this test
             '0x0000000000000000000000000000000000000000'//1inch, does not matter in this test
         )
         await eesee.deployed()
