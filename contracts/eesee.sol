@@ -33,6 +33,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     uint256 public fee = 0.10 ether;
     ///@dev Address {fee}s are sent to.
     address public feeCollector;
+    ///@dev The fee for chainlink VRF is shared between ticket buyers & eesee team. [1 ether == 100%]
+    uint256 public chainlinkFeeShare = 0.5 ether;
     ///@dev Denominator for fee & maxTicketsBoughtByAddress variables.
     uint256 private constant denominator = 1 ether;
 
@@ -280,9 +282,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @param amount - Amount of tickets to buy. A single address can't buy more than {maxTicketsBoughtByAddress} of all tickets. 
      
      * @return tokensSpent - ESE tokens spent.
+        Note: {chainlinkCostPerTicket(ID)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
      */
     function buyTickets(uint256 ID, uint256 amount) external payable returns(uint256 tokensSpent){
-        if(msg.value != chainlinkCostPerTicket(amount)) revert InvalidMsgValue();
+        if(msg.value != chainlinkCostPerTicket(ID)) revert InvalidMsgValue();
         tokensSpent = _buyTickets(ID, amount);
         ESE.safeTransferFrom(msg.sender, address(this), tokensSpent);
     }
@@ -294,8 +297,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      
      * @return tokensSpent - Tokens spent.
      * @return ticketsBought - Tickets bought.
+        Note: Additionaly {chainlinkCostPerTicket(ID)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
      */
-     //todo: add _chainlinkCostPerTicket()
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external nonReentrant payable returns(uint256 tokensSpent, uint256 ticketsBought){
         (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
         if(
@@ -308,9 +311,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
         bool isETH = (address(desc.srcToken) == address(0) || address(desc.srcToken) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         if(isETH){
-            if(msg.value != desc.amount) revert InvalidMsgValue();
+            if(msg.value != desc.amount + chainlinkCostPerTicket(ID)) revert InvalidMsgValue();
         }else{
-            if(msg.value != 0) revert InvalidMsgValue();
+            if(msg.value != chainlinkCostPerTicket(ID)) revert InvalidMsgValue();
             desc.srcToken.safeTransferFrom(msg.sender, address(this), desc.amount);
             desc.srcToken.approve(OneInchRouter, desc.amount);
         }
@@ -560,14 +563,13 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     //TODO: return that amount if listing is cancelled, return amount if overpaid
     /**
      * @dev Additional ETH that needs to be passed with buyTickets to pay for Chainlink gas costs.
-     * @param maxTickets - Amount of tickets to divide chainlink call cost.
+     * @param ID - ID of listing to check.
 
      *@return ETHPerTicket - ETH gas amount that has to be paid for each ticket bought.
      */
-     //TODO: use only half
-    function chainlinkCostPerTicket(uint256 maxTickets) public view returns(uint256 ETHPerTicket){
+    function chainlinkCostPerTicket(uint256 ID) public view returns(uint256 ETHPerTicket){
         uint256 maxETHCost = keyHashGasLane * (200000 + callbackGasLimit);//200000 is Verification gas
-        ETHPerTicket = maxETHCost / maxTickets;
+        ETHPerTicket = maxETHCost * chainlinkFeeShare / listings[ID].maxTickets / denominator;
     }
 
     /**
@@ -753,6 +755,18 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     function changeFeeCollector(address _feeCollector) external onlyOwner{
         emit ChangeFeeCollector(feeCollector, _feeCollector);
         feeCollector = _feeCollector;
+    }
+
+    /**
+     * @dev Changes chainlinkFeeShare. Emits {ChangeChainlinkFeeShare} event.
+     * @param _chainlinkFeeShare - New chainlink fee share.
+     * Note: This function can only be called by owner.
+     */
+    function changeChainlinkFeeShare(uint256 _chainlinkFeeShare) external onlyOwner {
+        if(_chainlinkFeeShare > denominator) revert ChainlinkFeeTooHigh();
+
+        emit ChangeChainlinkFeeShare(chainlinkFeeShare, _chainlinkFeeShare);
+        chainlinkFeeShare = _chainlinkFeeShare;
     }
 
     /**

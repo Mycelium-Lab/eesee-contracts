@@ -159,6 +159,11 @@ interface Ieesee {
         address indexed newFeeCollector
     );
 
+    event ChangeChainlinkFeeShare(
+        uint256 indexed previousChainlinkFeeShare, 
+        uint256 indexed newChainlinkFeeShare
+    );
+
     event ListDrop(
         uint256 indexed ID, 
         IERC721 indexed collection, 
@@ -189,6 +194,7 @@ interface Ieesee {
     error TicketPriceTooLow();
     error BuyAmountTooLow();
     error FeeTooHigh();
+    error ChainlinkFeeTooHigh();
     error MaxTicketsBoughtByAddressTooHigh();
 
     error AllTicketsBought();
@@ -237,6 +243,7 @@ interface Ieesee {
     function maxTicketsBoughtByAddress() external view returns(uint256);
     function fee() external view returns(uint256);
     function feeCollector() external view returns(address);
+    function chainlinkFeeShare() external view returns(uint256);
 
     function LINK() external view returns(LinkTokenInterface);
     function vrfCoordinator() external view returns(VRFCoordinatorV2Interface);
@@ -334,6 +341,7 @@ interface Ieesee {
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external;
     function changeFee(uint256 _fee) external;
     function changeFeeCollector(address _feeCollector) external;
+    function changeChainlinkFeeShare(uint256 _chainlinkFeeShare) external;
 
     function fund(uint256 _amount, uint256 amountOutMin) external returns (uint96 amount);
 }
