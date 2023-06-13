@@ -532,7 +532,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      
      * @return amount - ESE received.
      */
-    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
+    function batchReclaimTokens(uint256[] memory IDs, address recipient) external nonReentrant returns(uint256 amount){
         if(recipient == address(0)){
             revert InvalidRecipient();
         }
@@ -553,14 +553,18 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
             emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
 
+            uint256 chainlinkFeeRefund = chainlinkCostPerTicket(ID);
             if(listing.ticketsBought == 0 && listing.itemClaimed) delete listings[ID];
+
+            (bool success, ) = msg.sender.call{value: chainlinkFeeRefund}("");
+            if(!success) revert TransferNotSuccessful();
         }
         // Transfer later to save some gas
         ESE.safeTransfer(recipient, amount);
     }
 
     // ============ Getters ============
-    //TODO: return that amount if listing is cancelled, return amount if overpaid
+    //TODO: return amount if overpaid
     /**
      * @dev Additional ETH that needs to be passed with buyTickets to pay for Chainlink gas costs.
      * @param ID - ID of listing to check.
@@ -568,8 +572,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      *@return ETHPerTicket - ETH gas amount that has to be paid for each ticket bought.
      */
     function chainlinkCostPerTicket(uint256 ID) public view returns(uint256 ETHPerTicket){
-        uint256 maxETHCost = keyHashGasLane * (200000 + callbackGasLimit);//200000 is Verification gas
-        ETHPerTicket = maxETHCost * chainlinkFeeShare / listings[ID].maxTickets / denominator;
+        uint256 maxETHCost = keyHashGasLane * (200000 + callbackGasLimit); // 200000 is Verification gas
+        ETHPerTicket = maxETHCost * chainlinkFeeShare / listings[ID].maxTickets / denominator;//TODO: chainlinkfeeshare can be changed mid strat
     }
 
     /**
