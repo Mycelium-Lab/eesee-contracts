@@ -72,30 +72,25 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         IeeseeMinter _minter,
         address _feeCollector,
         IRoyaltyEngineV1 _royaltyEngine,
-        address _vrfCoordinator, 
+        ChainlinkContructorArgs memory chainlinkArgs,
         address _WETH,
-        LinkTokenInterface _LINK,
-        bytes32 _keyHash,
-        uint256 _keyHashGasLane,
-        uint16 _minimumRequestConfirmations,
-        uint32 _callbackGasLimit,
         IUniswapV2Router01 _UniswapV2Router,
         address _OneInchRouter
-    ) VRFConsumerBaseV2(_vrfCoordinator) {
+    ) VRFConsumerBaseV2(chainlinkArgs.vrfCoordinator) {
         ESE = _ESE;
         minter = _minter;
         feeCollector = _feeCollector;
         royaltyEngine = _royaltyEngine;
 
         // ChainLink stuff. Create subscription for VRF V2.
-        vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
+        vrfCoordinator = VRFCoordinatorV2Interface(chainlinkArgs.vrfCoordinator);
         subscriptionID = vrfCoordinator.createSubscription();
         vrfCoordinator.addConsumer(subscriptionID, address(this));
-        LINK = _LINK;
-        keyHash = _keyHash;
-        keyHashGasLane = _keyHashGasLane;
-        minimumRequestConfirmations = _minimumRequestConfirmations;
-        callbackGasLimit = _callbackGasLimit;
+        LINK = chainlinkArgs.LINK;
+        keyHash = chainlinkArgs.keyHash;
+        keyHashGasLane = chainlinkArgs.keyHashGasLane;
+        minimumRequestConfirmations = chainlinkArgs.minimumRequestConfirmations;
+        callbackGasLimit = chainlinkArgs.callbackGasLimit;
 
         UniswapV2Router = _UniswapV2Router;
         route = new address[](2);

@@ -66,6 +66,16 @@ interface Ieesee {
         uint256 fee;
     }
 
+    ///@dev Because of the Stack too deep error, we combine some constructor arguments into a single stuct
+    struct ChainlinkContructorArgs{
+        address vrfCoordinator;
+        LinkTokenInterface LINK;
+        bytes32 keyHash;
+        uint256 keyHashGasLane;
+        uint16 minimumRequestConfirmations;
+        uint32 callbackGasLimit;
+    }
+
     event ListItem(
         uint256 indexed ID,
         NFT indexed nft,
