@@ -564,7 +564,6 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     }
 
     // ============ Getters ============
-    //TODO: return amount if overpaid
     /**
      * @dev Additional ETH that needs to be passed with buyTickets to pay for Chainlink gas costs.
      * @param ID - ID of listing to check.
@@ -573,7 +572,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      */
     function chainlinkCostPerTicket(uint256 ID) public view returns(uint256 ETHPerTicket){
         uint256 maxETHCost = keyHashGasLane * (200000 + callbackGasLimit); // 200000 is Verification gas
-        ETHPerTicket = maxETHCost * chainlinkFeeShare / listings[ID].maxTickets / denominator;//TODO: chainlinkfeeshare can be changed mid strat
+        ETHPerTicket = maxETHCost * chainlinkFeeShare / listings[ID].maxTickets / denominator;
     }
 
     /**
