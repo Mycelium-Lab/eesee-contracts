@@ -2,61 +2,45 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./interfaces/IESECrowdsale.sol";
 
 contract ESE is ERC20 {
-    ///@dev Presale contract.
-    IESECrowdsale public immutable presale;
-    ///@dev Presale start timestamp.
-    uint256 public immutable presaleStart;
-    ///@dev Time in which tokens will be unlocked.
-    uint256 public immutable presaleUnlockTime;
+    struct Beneficiary{
+        uint256 amount;
+        address addr;
+    }
 
+    struct CrowdsaleVestingParams{
+        //uint256 amount;
+        uint256 cliff;
+        uint256 duration;
+        mapping(address => uint256) amounts;
+        //Beneficiary[] beneficiaries;
+    }
 
-    ///@dev Private sale contract.
-    IESECrowdsale public immutable privateSale;
-    ///@dev Presale start timestamp.
-    uint256 public immutable privateSaleStart;
-    ///@dev Periods over which tokens will be unlocked.
-    uint256 public immutable privateSalePeriods;
-    ///@dev Duration of each period.
-    uint256 public immutable privateSalePeriodTime;
+    ///@dev Presale params.
+    CrowdsaleVestingParams public immutable presale;
+    ///@dev Private sale params.
+    CrowdsaleVestingParams public immutable privateSale;
+    ///@dev Public sale params.
+    CrowdsaleVestingParams public immutable publicSale;
 
-    ///@dev Tokens locked by crowdsale contract for an address.
-    mapping(address => uint256) private presaleTokens;
-    mapping(address => uint256) private privateSaleTokens;
-
-    ///@dev False if ignore lock mechanism on private sales
-    bool public immutable lockPrivateSale;
-
-    error InvalidAmount();
-    error InvalidCrowdsale();
-    error TransferingLockedTokens(uint256 tokensLocked);
+    ///@dev Token generation event.
+    uint256 public immutable TGE;
 
     constructor(
         uint256 amount, 
-        
-        uint256 _presaleAmount, // 50000000 ESE
-        IESECrowdsale _presale, 
-        uint256 _presaleUnlockTime,//365 days
-
-        uint256 _privateSaleAmount, // 90000000 ESE
-        IESECrowdsale _privateSale,
-        uint256 _privateSalePeriods,//10
-        uint256 _privateSalePeriodTime//60 days
+        CrowdsaleVestingParams memory _presale,
+        CrowdsaleVestingParams memory _privateSale,
+        CrowdsaleVestingParams memory _publicSale
     ) ERC20("eesee", "ESE") {
-        if (amount == 0 || _presaleAmount == 0 || _privateSaleAmount == 0) revert InvalidAmount();
-        if (address(_presale) == address(0) || address(_privateSale) == address(0)) revert InvalidCrowdsale();
+        if (amount == 0) revert();
+
+        TGE = block.timestamp;
 
         presale = _presale;
-        presaleStart = _presale.openingTime();
-        presaleUnlockTime = _presaleUnlockTime;
+        //TODO: also add TGE mint to beneficiaries
+        //TODO: add global TGE mint
 
-        privateSale = _privateSale;
-        privateSaleStart = _privateSale.openingTime();
-        privateSalePeriods = _privateSalePeriods;
-        privateSalePeriodTime = _privateSalePeriodTime;
-        lockPrivateSale = _privateSalePeriods != 0 && _privateSalePeriodTime != 0;
         
         //TODO: IDO
         //TODO: liquidity
@@ -67,9 +51,6 @@ contract ESE is ERC20 {
 
         //TODO: remove this
         _mint(msg.sender, amount);
-
-        _mint(address(_presale), _presaleAmount);
-        _mint(address(_privateSale), _privateSaleAmount);
     }
 
     /**
