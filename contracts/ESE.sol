@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -29,10 +28,13 @@ contract ESE is Context, IERC20, IERC20Metadata {
         Beneficiary[] beneficiaries;
     }
     
-    ///@dev Presale/Private/Public sale vesting params.
-    CrowdsaleVestingParams public immutable presale;
-    CrowdsaleVestingParams public immutable privateSale;
-    CrowdsaleVestingParams public immutable publicSale;
+    ///@dev Vesting parameters.
+    CrowdsaleVestingParams public presale;
+    CrowdsaleVestingParams public privateSale;
+    CrowdsaleVestingParams public publicSale;
+    CrowdsaleVestingParams public teamAndAdvisors;
+    CrowdsaleVestingParams public marketplaceMining;
+    CrowdsaleVestingParams public staking;
 
     ///@dev Token generation event.
     uint256 public immutable TGE;
@@ -43,7 +45,7 @@ contract ESE is Context, IERC20, IERC20Metadata {
 
     uint256 private _totalSupply;
     uint256 private _totalReleased;
-    uint256 private immutable _totalSupplyAfterVesting;
+    uint256 private _totalVesting;
     string private _name;
     string private _symbol;
 
@@ -51,33 +53,27 @@ contract ESE is Context, IERC20, IERC20Metadata {
 
     //TODO: do we even need public round?
     constructor(
-        uint256 amount, 
         ConstructorCrowdsaleVestingParams memory _presale,
         ConstructorCrowdsaleVestingParams memory _privateSale,
         ConstructorCrowdsaleVestingParams memory _publicSale,
-        string memory name_, 
-        string memory symbol_
+        ConstructorCrowdsaleVestingParams memory _teamAndAdvisors,
+        ConstructorCrowdsaleVestingParams memory _marketplaceMining,
+        ConstructorCrowdsaleVestingParams memory _staking
     ) {
         _initCrowdsaleParams(_presale, presale);
         _initCrowdsaleParams(_privateSale, privateSale);
         _initCrowdsaleParams(_publicSale, publicSale);
-        _totalSupplyAfterVesting = presale.amount + privateSale.amount + publicSale.amount;
-        
+        _initCrowdsaleParams(_teamAndAdvisors, teamAndAdvisors);
+        _initCrowdsaleParams(_marketplaceMining, marketplaceMining);
+        _initCrowdsaleParams(_staking, staking);
+        // Overflow check
+        uint256 maxSupply = _totalSupply + _totalVesting;
 
-
-        //TODO: at TGE liquidity should be minted to IDO/ICO 
-
-        //TODO: team-advisors
-        //TODO: marketplace mining
         //TODO: marketing & partnerships
-        //TODO: staking
         //TODO: liquidity
 
-        //TODO: remove this
-        _mint(msg.sender, amount);
-
-        _name = name_;
-        _symbol = symbol_;
+        _name = "eesee";
+        _symbol = "$ESE";
         TGE = block.timestamp;
     }
 
@@ -105,7 +101,7 @@ contract ESE is Context, IERC20, IERC20Metadata {
      * no way affects any of the arithmetic of the contract, including
      * {IERC20-balanceOf} and {IERC20-transfer}.
      */
-    function decimals() external view returns (uint8) {
+    function decimals() external pure returns (uint8) {
         return 18;
     }
 
@@ -130,19 +126,39 @@ contract ESE is Context, IERC20, IERC20Metadata {
     /**
      * @dev Info on how many tokens have already been vested during 3 vesting periods in total.
      */
-    function totalVestedAmounts() external view returns(uint256 _presale, uint256 _privateSale, uint256 _publicSale){
+    function totalVestedAmounts() external view returns(
+        uint256 _presale, 
+        uint256 _privateSale, 
+        uint256 _publicSale,
+        uint256 _teamAndAdvisors,
+        uint256 _marketplaceMining,
+        uint256 _staking
+    ){
         _presale = _totalVestedAmount(presale);
         _privateSale = _totalVestedAmount(privateSale);
         _publicSale = _totalVestedAmount(publicSale);
+        _teamAndAdvisors = _totalVestedAmount(teamAndAdvisors);
+        _marketplaceMining = _totalVestedAmount(marketplaceMining);
+        _staking = _totalVestedAmount(staking);
     }
 
     /**
      * @dev Info on how many tokens have already been vested during 3 vesting periods for account.
      */
-    function vestedAmounts(address account) external view returns(uint256 _presale, uint256 _privateSale, uint256 _publicSale){
+    function vestedAmounts(address account) external view returns(
+        uint256 _presale, 
+        uint256 _privateSale, 
+        uint256 _publicSale,
+        uint256 _teamAndAdvisors,
+        uint256 _marketplaceMining,
+        uint256 _staking
+    ){
         _presale = _vestedAmount(presale, account);
         _privateSale = _vestedAmount(privateSale, account);
         _publicSale = _vestedAmount(publicSale, account);
+        _teamAndAdvisors = _vestedAmount(teamAndAdvisors, account);
+        _marketplaceMining = _vestedAmount(marketplaceMining, account);
+        _staking = _vestedAmount(staking, account);
     }
 
     /**
@@ -278,11 +294,15 @@ contract ESE is Context, IERC20, IERC20Metadata {
         unchecked {
             uint256 fromBalance = _balances[from] + releasableAmount;
             require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
-
             _balances[from] = fromBalance - amount;
+
             // Overflow not possible: _totalReleased is capped by _totalSupplyAfterVesting.
-            _totalReleased += releasableAmount;
-            _released[from] += releasableAmount;
+            if(releasableAmount > 0){
+                _totalReleased += releasableAmount;
+                _released[from] += releasableAmount;
+
+                emit Transfer(address(0), from, releasableAmount);
+            }
             // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
             // decrementing then incrementing.
             _balances[to] += amount;
@@ -305,7 +325,7 @@ contract ESE is Context, IERC20, IERC20Metadata {
 
         _totalSupply += amount;
         //Check for overflows
-        uint256 _ = _totalSupply + _totalSupplyAfterVesting;
+        uint256 maxSupply = _totalSupply + _totalVesting;
         unchecked {
             // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
             _balances[account] += amount;
@@ -360,18 +380,25 @@ contract ESE is Context, IERC20, IERC20Metadata {
         }
     }
 
-    function _initCrowdsaleParams(ConstructorCrowdsaleVestingParams memory crowdsaleParams, CrowdsaleVestingParams storage crowdsale) internal{
+    function _initCrowdsaleParams(ConstructorCrowdsaleVestingParams memory crowdsaleParams, CrowdsaleVestingParams storage crowdsale) internal {
+        require(crowdsale.amount == 0, "ESE: Crowdsale already initialized");
         crowdsale.cliff = crowdsaleParams.cliff;
         crowdsale.duration = crowdsaleParams.duration;
-        for(uint256 i; i < crowdsaleParams.beneficiaries.length; i++){
+        uint256 totalVestingAmount;
+        for(uint256 i; i < crowdsaleParams.beneficiaries.length;){
             require (crowdsaleParams.TGEMintShare <= denominator, "ESE: Invalid TGEMintShare");
             uint256 TGEMint = crowdsaleParams.beneficiaries[i].amount * crowdsaleParams.TGEMintShare / denominator;
-            _mint(crowdsaleParams.beneficiaries[i].addr, TGEMint);
+            if(TGEMint != 0){
+                _mint(crowdsaleParams.beneficiaries[i].addr, TGEMint);
+            }
 
             uint256 vestingAmount = crowdsaleParams.beneficiaries[i].amount - TGEMint;
-            crowdsale.amounts[crowdsaleParams.beneficiaries[i].addr] = vestingAmount;
-            crowdsale.amount += vestingAmount;
+            crowdsale.amounts[crowdsaleParams.beneficiaries[i].addr] += vestingAmount;
+            totalVestingAmount += vestingAmount;
+            unchecked{ i++; }
         }
+        crowdsale.amount = totalVestingAmount;
+        _totalVesting += totalVestingAmount;
     }
 
     /**
@@ -379,7 +406,14 @@ contract ESE is Context, IERC20, IERC20Metadata {
      */
     function _totalReleasableAmount() internal view returns(uint256){
         unchecked{
-            return _totalVestedAmount(presale) + _totalVestedAmount(privateSale) + _totalVestedAmount(publicSale) - _totalReleased;
+            return 
+                _totalVestedAmount(presale) + 
+                _totalVestedAmount(privateSale) + 
+                _totalVestedAmount(publicSale) +
+                _totalVestedAmount(teamAndAdvisors) +
+                _totalVestedAmount(marketplaceMining) +
+                _totalVestedAmount(staking) -
+                _totalReleased;
         }
     }
 
@@ -408,7 +442,14 @@ contract ESE is Context, IERC20, IERC20Metadata {
      */
     function _releasableAmount(address account) internal view returns(uint256){
         unchecked{
-            return _vestedAmount(presale, account) + _vestedAmount(privateSale, account) + _vestedAmount(publicSale, account) - _released[account];
+            return 
+                _vestedAmount(presale, account) + 
+                _vestedAmount(privateSale, account) + 
+                _vestedAmount(publicSale, account) +
+                _vestedAmount(teamAndAdvisors, account) +
+                _vestedAmount(marketplaceMining, account) +
+                _vestedAmount(staking, account) -
+                _released[account];
         }
     }
 
