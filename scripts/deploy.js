@@ -22,73 +22,49 @@ async function verify(contract, constructorArguments, name){
     }
 }
 async function main() {
-
     const ESE = await ethers.getContractFactory("ESE");
-    const ESECrowdsale = await ethers.getContractFactory("ESECrowdsale");
     const minter = await ethers.getContractFactory("eeseeMinter");
-    const pool = await ethers.getContractFactory("eeseePool");
+    const pool = await ethers.getContractFactory("eeseeMiningRewardsPool");
     const eesee = await ethers.getContractFactory("eesee");
 
-    let USDT
-    if(network.name === 'goerli'){
-        const MockERC20 = await ethers.getContractFactory("MockERC20");
-        const _MockERC20 = await MockERC20.deploy('1000000000000000000000000000')
-        await verify(_MockERC20, ['1000000000000000000000000000'], "contracts/test/MockERC20.sol:MockERC20")
-        USDT = _MockERC20.address
-    }else if(network.name === 'ethereum'){
-        USDT = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
-    }else if(network.name === 'polygon'){
-        USDT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'
-    }else{
-        return
-    }
-
-    const [owner] = await ethers.getSigners()
-    const transactionCount = await owner.getTransactionCount()
-    const futureESEAddress = getContractAddress({
-      from: owner.address,
-      nonce: transactionCount+2
-    })
-
-    let args
-    const date = parseInt(Date.now() / 1000)
-    args = [
-        125000000000000, //0.008$/ESE
-        '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', //TODO: change
-        futureESEAddress, 
-        USDT, 
-        ethers.utils.parseUnits('125000', 'ether'),//Min ESE (10000$)
-        ethers.utils.parseUnits('25000000', 'ether'),//Max ESE (200000$)
-        date + 600, //TODO: change
-        date + 31536000, //TODO: change
-        '0x0000000000000000000000000000000000000000000000000000000000000000' //TODO: change
-    ]
-    const Presale = await ESECrowdsale.deploy(...args)
-    await verify(Presale, args, "contracts/Crowdsale/ESECrowdsale.sol:ESECrowdsale")
-
-    args = [
-        71428571428571, //0.014$/ESE
-        '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', //TODO: change
-        futureESEAddress, 
-        USDT, 
-        ethers.utils.parseUnits('1000000', 'ether'), //Min ESE  ($14000)
-        ethers.utils.parseUnits('90000000', 'ether'), //Max ESE ($1260000)
-        date + 600, //TODO: change
-        date + 31536000, //TODO: change
-        '0x0000000000000000000000000000000000000000000000000000000000000000'//TODO: change
-    ]
-    const PrivateSale = await ESECrowdsale.deploy(...args)
-    await verify(PrivateSale, args, "contracts/Crowdsale/ESECrowdsale.sol:ESECrowdsale")
-
-    args = [
-        '1000000000000000000000000000',//TODO: remove var
-        ethers.utils.parseUnits('50000000', 'ether'), 
-        Presale.address, 
-        31536000, //presale lock
-        ethers.utils.parseUnits('90000000', 'ether'), 
-        PrivateSale.address, 
-        10, //Private sale periods
-        5184000//Private sale period duration
+    let month = 60*60*24*365/12
+    let args = [
+        {//presale
+            cliff: month*6,
+            duration: month*18,
+            TGEMintShare: 1000,
+            beneficiaries: []
+        },
+        {//private sale
+            cliff: month*6,
+            duration: month*18,
+            TGEMintShare: 1000,
+            beneficiaries: []
+        },
+        {//public sale
+            cliff: month*2,
+            duration: month*10,
+            TGEMintShare: 1500,
+            beneficiaries: []
+        },
+        {//teamAndAdvisors
+            cliff: month*10,
+            duration: month*38,
+            TGEMintShare: 10000,//TODO: change to 0
+            beneficiaries: [{addr: signer.address, amount: '1000000000000000000000000000'}]
+        },
+        {//marketplaceMining
+            cliff: 0,
+            duration: month*70,
+            TGEMintShare: 0,
+            beneficiaries: []
+        },
+        {//staking
+            cliff: 0,
+            duration: month*36,
+            TGEMintShare: 0,
+            beneficiaries: []
+        }
     ]
     const _ESE = await ESE.deploy(...args)
     await verify(_ESE, args, "contracts/ESE.sol:ESE")
@@ -99,7 +75,7 @@ async function main() {
     
     args = [_ESE.address]
     const _pool = await pool.deploy(...args)
-    await verify(_pool, args, "contracts/eeseePool.sol:eeseePool")
+    await verify(_pool, args, "contracts/eeseeMiningRewardsPool.sol:eeseeMiningRewardsPool")
 
     let _eesee
     if(network.name === 'goerli'){

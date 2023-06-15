@@ -29,7 +29,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     //Note: Users can still buy 1 ticket even if this check fails. e.g. there is a listing with only 2 tickets and this is set to 20%.
     uint256 public maxTicketsBoughtByAddress = 0.20 ether;
     ///@dev Fee that is collected to {feeCollector} from each fulfilled listing. [1 ether == 100%]
-    uint256 public fee = 0.10 ether;
+    uint256 public fee = 0.06 ether;
     ///@dev Address {fee}s are sent to.
     address public feeCollector;
     ///@dev Denominator for fee & maxTicketsBoughtByAddress variables.
@@ -186,8 +186,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         (collection, tokenIDs) = minter.mintToPublicCollection(maxTickets.length, tokenURIs, royaltyReceiver, royaltyFeeNumerator);
 
         IDs = new uint256[](maxTickets.length);
-        for(uint256 i; i < maxTickets.length; i++){
+        for(uint256 i; i < maxTickets.length;){
             IDs[i] = _listItem(NFT(collection, tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
+            unchecked{ i++; }
         }
     }
 
@@ -253,8 +254,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         (collection, tokenIDs) = minter.mintToPrivateCollection(maxTickets.length, name, symbol, baseURI, contractURI, royaltyReceiver, royaltyFeeNumerator);
         
         IDs = new uint256[](maxTickets.length);
-        for(uint256 i; i < maxTickets.length; i++){
+        for(uint256 i; i < maxTickets.length;){
             IDs[i] = _listItem(NFT(collection, tokenIDs[i]), maxTickets[i], ticketPrices[i], durations[i]);
+            unchecked{ i++; }
         }
     }
 
@@ -402,8 +404,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             ESE.safeTransfer(drop.earningsCollector, mintPrice - fees);
         }
 
-        for(uint256 i; i < quantity; i++){
+        for(uint256 i; i < quantity;){
             emit MintDrop(ID, NFT(drop.collection, nextTokenId + i), msg.sender, mintFee);
+            unchecked{ i++; }
         }
     }
 
@@ -421,7 +424,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
-        for(uint256 i; i < IDs.length; i++){
+        for(uint256 i; i < IDs.length;){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
 
@@ -436,6 +439,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             emit ReceiveItem(ID, listing.nft, recipient);
 
             if(listing.tokensClaimed) delete listings[ID];
+            unchecked{ i++; }
         }
     }
 
@@ -448,7 +452,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      */
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
         if(recipient == address(0)) revert InvalidRecipient();
-        for(uint256 i; i < IDs.length; i++){
+        for(uint256 i; i < IDs.length;){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
 
@@ -465,6 +469,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             emit ReceiveTokens(ID, recipient, _amount);
 
             if(listing.itemClaimed) delete listings[ID];
+            unchecked{ i++; }
         }
         // Transfer later to save gas
         ESE.safeTransfer(recipient, amount);
@@ -484,7 +489,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         collections = new IERC721[](IDs.length);
         tokenIDs = new uint256[](IDs.length);
 
-        for(uint256 i; i < IDs.length; i++){
+        for(uint256 i; i < IDs.length;){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
 
@@ -501,6 +506,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             emit ReclaimItem(ID, listing.nft, recipient);
 
             if(listing.ticketsBought == 0) delete listings[ID];
+            unchecked{ i++; }
         }
     }
 
@@ -515,7 +521,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         if(recipient == address(0)){
             revert InvalidRecipient();
         }
-        for(uint256 i; i < IDs.length; i++){
+        for(uint256 i; i < IDs.length;){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
             uint256 ticketsBoughtByAddress = listing.ticketsBoughtByAddress[msg.sender];
@@ -533,6 +539,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
 
             if(listing.ticketsBought == 0 && listing.itemClaimed) delete listings[ID];
+            unchecked{ i++; }
         }
         // Transfer later to save some gas
         ESE.safeTransfer(recipient, amount);
@@ -610,10 +617,13 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
         tokensSpent = listing.ticketPrice * amount;
 
-        for(uint256 i; i < amount; i++){
+        for(uint256 i; i < amount;){
             emit BuyTicket(ID, msg.sender, listing.ticketsBought, listing.ticketPrice);
             listing.ticketIDBuyer[listing.ticketsBought] = msg.sender;
-            listing.ticketsBought += 1;
+            unchecked { 
+                listing.ticketsBought++; 
+                i++; 
+            }
         }
         listing.ticketsBoughtByAddress[msg.sender] += amount;
 
@@ -632,13 +642,14 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
     function _collectRoyalties(uint256 value, NFT memory nft, address listingOwner) internal returns(uint256 royaltyAmount) {
         (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(address(nft.collection), nft.tokenID, value);
-        for(uint256 i = 0; i < recipients.length; i++){
+        for(uint256 i = 0; i < recipients.length;){
             //There is no reason to collect royalty from owner if it goes to owner
             if (recipients[i] != address(0) && recipients[i] != listingOwner && amounts[i] != 0){
                 ESE.safeTransfer(recipients[i], amounts[i]);
                 royaltyAmount += amounts[i];
                 emit CollectRoyalty(recipients[i], amounts[i]);
             }
+            unchecked{ i++; }
         }
     }
 
