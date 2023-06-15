@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockUniswapV2Router {
     IERC20 token;
+    uint256 adjustValue = 1 ether;
     constructor(IERC20 _token){
         token = _token;
     }
@@ -13,9 +14,15 @@ contract MockUniswapV2Router {
         payable
         returns (uint[] memory amounts)
     {
-        token.transfer(msg.sender, msg.value);
+        uint256 value = msg.value * adjustValue / 1 ether;
+        token.transfer(msg.sender, value);
         amounts = new uint[](2);
         amounts[0] = msg.value;
-        amounts[1] = msg.value;
+        amounts[1] = value;
+    }
+
+    function adjust(uint256 newValue)external
+    {
+        adjustValue = newValue;
     }
 }

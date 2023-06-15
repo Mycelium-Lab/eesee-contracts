@@ -135,11 +135,12 @@ const {
                 keyHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                 keyHashGasLane: 200000000000,
                 minimumRequestConfirmations: 0,
-                callbackGasLimit: 50000
+                callbackGasLimit: 50000,
+                LINK_ETH_DataFeed: zeroAddress// does not matter in this test
             },
-            '0x0000000000000000000000000000000000000000',//Weth, does not matter in this test
-            '0x0000000000000000000000000000000000000000',//uniswap, does not matter in this test
-            '0x0000000000000000000000000000000000000000'//1inch, does not matter in this test
+            zeroAddress,//Weth, does not matter in this test
+            zeroAddress,//uniswap, does not matter in this test
+            zeroAddress//1inch, does not matter in this test
         )
         await eesee.deployed()
         currentTimestamp = (await ethers.provider.getBlock()).timestamp;

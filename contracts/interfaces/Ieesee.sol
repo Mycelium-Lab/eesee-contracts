@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "./IeeseeMinter.sol";
@@ -74,6 +75,7 @@ interface Ieesee {
         uint256 keyHashGasLane;
         uint16 minimumRequestConfirmations;
         uint32 callbackGasLimit;
+        AggregatorV3Interface LINK_ETH_DataFeed;
     }
 
     event ListItem(
@@ -217,11 +219,13 @@ interface Ieesee {
     error InvalidEarningsCollector();
     error InvalidQuantity();
     error InvalidRecipient();
+    error InvalidAnswer();
+    error InvalidAmount();
+    error InsufficientETH();
 
     error SwapNotSuccessful();
     error TransferNotSuccessful();
     error EthDepositRejected();
-    error InvalidAmount();
 
     function listings(uint256) external view returns(
         uint256 ID,
@@ -339,7 +343,7 @@ interface Ieesee {
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
     function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs);
-    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
+    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount, uint256 chainlinkFeeRefund);
 
     function ChainlinkFee(uint256 ID, uint256 amount) external view returns(uint256);
     function getListingsLength() external view returns(uint256 length);
@@ -353,5 +357,5 @@ interface Ieesee {
     function changeFeeCollector(address _feeCollector) external;
     function changeChainlinkFeeShare(uint256 _chainlinkFeeShare) external;
 
-    function fund(uint256 _amount, uint256 amountOutMin) external returns (uint96 amount);
+    function fund(uint256 amount, uint256 amountETH) external returns (uint256);
 }

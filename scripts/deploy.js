@@ -121,11 +121,17 @@ async function main() {
             _minter.address,
             '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', 
             '0xEF770dFb6D5620977213f55f99bfd781D04BBE15',//royaltyEngine
-            '0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D',//vrfCoordinator
-            '0x326C977E6efc84E512bB9C30f76E30c160eD06FB',//ChainLink token
-            '0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15',//150 gwei hash
-            3,//minimumRequestConfirmations
-            50000,//callbackGasLimit
+            {
+                vrfCoordinator: '0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D',//vrfCoordinator
+                LINK: '0x326C977E6efc84E512bB9C30f76E30c160eD06FB',//ChainLink token
+                keyHash: '0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15',//150 gwei hash
+                keyHashGasLane: 150000000000,
+                minimumRequestConfirmations: 3,//minimumRequestConfirmations
+                callbackGasLimit: 50000,//callbackGasLimit
+                LINK_ETH_DataFeed: '0xb4c4a493AB6356497713A78FFA6c60FB53517c63'
+            },
+            '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6',//WETH
+            '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',//uinswapRouter
             mock1InchRouter.address
         ]
     }else if(network.name === 'ethereum'){
@@ -134,12 +140,18 @@ async function main() {
             _minter.address,
             '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', //TODO
             '0x0385603ab55642cb4Dd5De3aE9e306809991804f',//royaltyEngine
-            '0x271682DEB8C4E0901D1a1550aD2e64D568E69909',//vrfCoordinator
-            '0x514910771AF9Ca656af840dff83E8264EcF986CA',//ChainLink token
-            '0x8af398995b04c28e9951adb9721ef74c74f93e6a478f39e7e0777be13527e7ef',//150 gwei hash
-            13,//minimumRequestConfirmations
-            50000,//callbackGasLimit
-            '0x1111111254eeb25477b68fb85ed929f73a960582'
+            {
+                vrfCoordinator:'0x271682DEB8C4E0901D1a1550aD2e64D568E69909',//vrfCoordinator
+                LINK: '0x514910771AF9Ca656af840dff83E8264EcF986CA',//ChainLink token
+                keyHash: '0x8af398995b04c28e9951adb9721ef74c74f93e6a478f39e7e0777be13527e7ef',//200 gwei hash
+                keyHashGasLane: 200000000000,
+                minimumRequestConfirmations: 13,//minimumRequestConfirmations
+                callbackGasLimit: 50000,//callbackGasLimit
+                LINK_ETH_DataFeed: '0xdc530d9457755926550b59e8eccdae7624181557'
+            },
+            '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',//weth
+            '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',//uinswapRouter
+            '0x1111111254eeb25477b68fb85ed929f73a960582'//oneInch
         ]
     }else if(network.name === 'polygon'){
         args = [
@@ -147,11 +159,17 @@ async function main() {
             _minter.address, 
             '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058', //TODO
             '0x28EdFcF0Be7E86b07493466e7631a213bDe8eEF2',//royaltyEngine
-            '0xAE975071Be8F8eE67addBC1A82488F1C24858067',//vrfCoordinator
-            '0xb0897686c545045aFc77CF20eC7A532E3120E0F1',//ChainLink token
-            '0x6e099d640cde6de9d40ac749b4b594126b0169747122711109c9985d47751f93',//200 gwei hash
-            13,//minimumRequestConfirmations
-            50000,//callbackGasLimit
+            {
+                vrfCoordinator:'0xAE975071Be8F8eE67addBC1A82488F1C24858067',//vrfCoordinator
+                LINK: '0xb0897686c545045aFc77CF20eC7A532E3120E0F1',//ChainLink token
+                keyHash: '0x6e099d640cde6de9d40ac749b4b594126b0169747122711109c9985d47751f93',//200 gwei hash
+                keyHashGasLane: 200000000000,
+                minimumRequestConfirmations: 13,//minimumRequestConfirmations
+                callbackGasLimit: 50000,//callbackGasLimit
+                LINK_ETH_DataFeed: '0x5787BefDc0ECd210Dfa948264631CD53E68F7802'
+            },
+            '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',//weth
+            '0xa5e0829caced8ffdd4de3c43696c57f7d7a678ff',//quickswapRouter
             '0x1111111254eeb25477b68fb85ed929f73a960582'
         ]
     }else{

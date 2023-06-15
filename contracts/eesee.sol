@@ -52,6 +52,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     uint16 immutable public minimumRequestConfirmations;
     ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
     uint32 immutable private callbackGasLimit;
+    ///@dev Chainlink oracle data feed for correct ETH => LINK conversions.
+    AggregatorV3Interface immutable private LINK_ETH_DataFeed;
+
 
     ///@dev The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract.
     IRoyaltyEngineV1 immutable public royaltyEngine;
@@ -91,6 +94,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         keyHashGasLane = chainlinkArgs.keyHashGasLane;
         minimumRequestConfirmations = chainlinkArgs.minimumRequestConfirmations;
         callbackGasLimit = chainlinkArgs.callbackGasLimit;
+        LINK_ETH_DataFeed = chainlinkArgs.LINK_ETH_DataFeed;
 
         UniswapV2Router = _UniswapV2Router;
         route = new address[](2);
@@ -334,7 +338,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         value += ChainlinkFee(ID, ticketsBought);
         if(msg.value < value) {
             revert InvalidMsgValue();
-        } else {
+        } else if(msg.value != value){
             (bool success, ) = msg.sender.call{value: msg.value - value}("");
             if(!success) revert TransferNotSuccessful();
         }
@@ -536,8 +540,9 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @param recipient - Address to send tokens to.
      
      * @return amount - ESE received.
+     * @return chainlinkFeeRefund - Chainlink refund received
      */
-    function batchReclaimTokens(uint256[] memory IDs, address recipient) external nonReentrant returns(uint256 amount){
+    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount, uint256 chainlinkFeeRefund){
         if(recipient == address(0)){
             revert InvalidRecipient();
         }
@@ -556,16 +561,16 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             uint256 _amount = ticketsBoughtByAddress * listing.ticketPrice;
             amount += _amount;
 
+            chainlinkFeeRefund += ChainlinkFee(ID, ticketsBoughtByAddress);
             emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
-
-            uint256 chainlinkFeeRefund = ChainlinkFee(ID, ticketsBoughtByAddress);
             if(listing.ticketsBought == 0 && listing.itemClaimed) delete listings[ID];
-
-            (bool success, ) = msg.sender.call{value: chainlinkFeeRefund}("");
-            if(!success) revert TransferNotSuccessful();
         }
         // Transfer later to save some gas
         ESE.safeTransfer(recipient, amount);
+        if(chainlinkFeeRefund > 0){
+            (bool success, ) = msg.sender.call{value: chainlinkFeeRefund}("");
+            if(!success) revert TransferNotSuccessful();
+        }
     }
 
     // ============ Getters ============
@@ -582,7 +587,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         
         uint256 maxETH = keyHashGasLane * (200000 + callbackGasLimit); // 200000 is Verification gas
         // Total cost is maxETH * chainlinkFeeShare * (amount / maxTickets)
-        return maxETH * chainlinkFeeShare * amount / maxTickets / denominator;
+        return maxETH * chainlinkFeeShare * amount / (maxTickets * denominator);
     }
 
     /**
@@ -785,26 +790,34 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     /**
      * @dev Fund function for Chainlink's VRF V2 subscription.
      * @param amount - Amount of LINK to fund subscription with.
-     * @param amountOutMin - Min amount of Chainlink that can be received from swap.
+     * @param amountETH - Amount of ETH to swap using Uniswap.
+
+     * @return uint256 - Amount funded
      */
-    function fund(uint256 _amount, uint256 amountOutMin) external returns (uint96 amount){
-        if(_amount > 0){
-            IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), _amount);
+    function fund(uint256 amount, uint256 amountETH) external returns (uint256){
+        if(amount != 0){
+            IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), amount);
         }
         
-        uint256 balance = address(this).balance;
-        if(balance > 0){
-            uint256[] memory amounts = UniswapV2Router.swapExactETHForTokens{value: balance}(amountOutMin, route, address(this), block.timestamp);
-            _amount += amounts[1];
-        }
+        if(amountETH > address(this).balance) revert InsufficientETH();
+        if(amountETH != 0){
+            uint256[] memory amounts = UniswapV2Router.swapExactETHForTokens{value: amountETH}(0, route, address(this), block.timestamp);
+            (,int answer,,,) = LINK_ETH_DataFeed.latestRoundData();
+            if(answer <= 0) revert InvalidAnswer();
 
-        if(_amount == 0 || _amount > type(uint96).max) revert InvalidAmount();
-        amount = uint96(_amount);
+            // max slippage is 1%
+            uint256 minAmountWithSlippage = amountETH * 1 ether * 99 / (uint256(answer) * 100);
+            if(amounts[1] < minAmountWithSlippage) revert InvalidAmount();
+            amount += amounts[1];
+        }
+        if(amount == 0) revert InvalidAmount();
 
         LINK.transferAndCall(
             address(vrfCoordinator),
             amount,
             abi.encode(subscriptionID)
         );
+
+        return amount;
     }
 }

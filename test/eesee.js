@@ -38,6 +38,7 @@ const {
         const _mock1InchRouter = await hre.ethers.getContractFactory("Mock1InchRouter");
         const _mockUniswapV2Router = await hre.ethers.getContractFactory("MockUniswapV2Router");
         const _privateSale = await hre.ethers.getContractFactory('ESECrowdsale')
+        const _mockAggregator = await hre.ethers.getContractFactory('MockAggregator')
 
         const mockPresale = await _privateSale.deploy(125000000000000, oneAddress, oneAddress, oneAddress, 1000000000, 200000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
         await mockPresale.deployed()
@@ -58,8 +59,11 @@ const {
 
         await ESE.deployed()
 
-        ERC20 = await _MockERC20.deploy('2000000000000000000000000')
+        ERC20 = await _MockERC20.deploy('20000000000000000000000000000')
         await ERC20.deployed()
+
+        mockAggregator = await _mockAggregator.deploy()
+        await mockAggregator.deployed()
 
         mockVRF = await _mockVRF.deploy()
         await mockVRF.deployed()
@@ -75,8 +79,9 @@ const {
         await ESE.transfer(mock1InchExecutor.address, '1000000000000000000000000')
         await ERC20.transfer(mock1InchExecutor.address, '1000000000000000000000000')
 
-        mockUniswapV2Router = await _mockUniswapV2Router.deploy(ESE.address);
+        mockUniswapV2Router = await _mockUniswapV2Router.deploy(ERC20.address);
         await ESE.transfer(mockUniswapV2Router.address, '10000000000000000000000')
+        await ERC20.transfer(mockUniswapV2Router.address, ethers.utils.parseEther('10'))
 
         mock1InchRouter = await _mock1InchRouter.deploy();
         await mock1InchRouter.deployed()
@@ -88,11 +93,12 @@ const {
             royaltyEninge.address, 
             {
                 vrfCoordinator: mockVRF.address,
-                LINK: zeroAddress,
+                LINK: ERC20.address,
                 keyHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                 keyHashGasLane: 200000000000,
                 minimumRequestConfirmations: 0,
-                callbackGasLimit: 50000
+                callbackGasLimit: 50000,
+                LINK_ETH_DataFeed: mockAggregator.address
             },
             ERC20.address,
             mockUniswapV2Router.address,
@@ -264,6 +270,7 @@ const {
         const listing = await eesee.listings(ID);
         assert.equal(listing.ticketsBought, 20, "ticketsBought is correct")
     })
+    let expiredChainlinkCost
 
     it('Buys all tickets', async () => {
         const ID = 1
@@ -308,6 +315,7 @@ const {
         //buy tickets for listing that will expire
         const expiredListingID = 2
         chainlinkCost = await eesee.ChainlinkFee(expiredListingID, 5)
+        expiredChainlinkCost = chainlinkCost
         const buyTicketsForExpiredReceipt = expect(eesee.connect(acc7).buyTickets(expiredListingID, 5, {value: chainlinkCost}))
         for(let i = 0; i < 5; i ++) {
             await buyTicketsForExpiredReceipt.to.emit(eesee, "BuyTicket").withArgs(expiredListingID, acc7.address, i, 3)
@@ -391,10 +399,21 @@ const {
     })
     it('Can reclaim tokens if listing is expired', async () => {
         const expiredListingID = 2
+        const balanceBefore = await ethers.provider.getBalance(acc7.address);
+        const balanceBeforeTokens = await ESE.balanceOf(acc7.address); 
         const listing = await eesee.listings(expiredListingID)
-        await expect(eesee.connect(acc7).batchReclaimTokens([expiredListingID], acc7.address))
+        const tx = await eesee.connect(acc7).batchReclaimTokens([expiredListingID], acc7.address)
+        const _tx = await tx.wait()
+
+        await expect(tx)
         .to.emit(eesee, "ReclaimTokens")
         .withArgs(expiredListingID, acc7.address, acc7.address, 5, listing.ticketPrice.mul(ethers.BigNumber.from(5))) //emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
+        
+        const balanceAfterTokens = await ESE.balanceOf(acc7.address); 
+        const balanceAfter = await ethers.provider.getBalance(acc7.address); 
+
+        assert.equal(balanceAfterTokens.sub(balanceBeforeTokens), listing.ticketPrice * 5, "balance is correct")
+        assert.equal(balanceAfter.sub(balanceBefore).toString(), expiredChainlinkCost.sub(_tx.cumulativeGasUsed * _tx.effectiveGasPrice).toString(), "balance is correct")
     })
     it('Can reclaim item if listing is expired', async () => {
         const IDs = [2,3,4]
@@ -923,5 +942,22 @@ const {
         expectedReceive = BigInt(ethers.utils.parseUnits('0.06', 'ether')) - expectedFee
         assert.equal(BigInt(collectorBalanceAfter) - BigInt(collectorBalanceBefore), expectedReceive, "Amount collected is correct")
     })
-    //TODO: fund check
+    it('trades for link', async () => {
+        const tx = {
+            from: signer.address,
+            to: eesee.address,
+            value: ethers.utils.parseEther('1'),
+          }
+        await signer.sendTransaction(tx)
+        await expect(eesee.fund(0, ethers.utils.parseEther('1.1'))).to.be.revertedWithCustomError(eesee, "InsufficientETH")
+        await expect(eesee.fund(0,0)).to.be.revertedWithCustomError(eesee, "InvalidAmount")
+
+        await eesee.fund(0, ethers.utils.parseEther('1'))
+        assert.equal((await ERC20.balanceOf(mockVRF.address)).toString(), ethers.utils.parseEther('1').toString(), "Transferred tokens are correct")
+
+        await signer.sendTransaction(tx)
+        //adjust token ration iside of mock router, make it output lower
+        await mockUniswapV2Router.adjust(ethers.utils.parseEther('0.98'))
+        await expect(eesee.fund(0, ethers.utils.parseEther('1'))).to.be.revertedWithCustomError(eesee, "InvalidAmount")
+    })
 });
