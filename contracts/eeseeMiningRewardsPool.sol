@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract eeseePool is Ownable{
+contract eeseeMiningRewardsPool is Ownable{
     using SafeERC20 for IERC20;
     /**
      * @dev Claim:
