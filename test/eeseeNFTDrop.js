@@ -95,23 +95,44 @@ const {
         const _minter = await hre.ethers.getContractFactory("eeseeMinter");
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
         const _eeseeNFTDrop = await hre.ethers.getContractFactory("eeseeNFTDrop")
-        const _privateSale = await hre.ethers.getContractFactory('ESECrowdsale')
-
-        const mockPresale = await _privateSale.deploy(125000000000000, oneAddress, oneAddress, oneAddress, 1000000000, 200000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
-        await mockPresale.deployed()
-
-        const mockPrivateSale = await _privateSale.deploy(71428571428571, oneAddress, oneAddress, oneAddress, 14000000000, 1660000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
-        await mockPrivateSale.deployed()
 
         ESE = await _ESE.deploy(
-            '1000000000000000000000000', 
-            '50000000000000000000000000', 
-            mockPresale.address, 
-            31536000, 
-            '90000000000000000000000000', 
-            mockPrivateSale.address, 
-            10, 
-            5184000
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 10000,
+                beneficiaries: [{addr: signer.address, amount:'1000000000000000000000000'}]
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            }
         )
         await ESE.deployed()
 

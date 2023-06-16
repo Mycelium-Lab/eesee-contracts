@@ -37,28 +37,50 @@ const {
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
         const _mock1InchExecutor = await hre.ethers.getContractFactory("Mock1InchExecutor");
         const _mock1InchRouter = await hre.ethers.getContractFactory("Mock1InchRouter");
-        const _mockUniswapV2Router = await hre.ethers.getContractFactory("MockUniswapV2Router");
-        const _privateSale = await hre.ethers.getContractFactory('ESECrowdsale')
         const _mockAggregator = await hre.ethers.getContractFactory('MockAggregator')
         const _MockEeseeFunder = await hre.ethers.getContractFactory('MockEeseeFunder')
+        const _mockUniswapV2Router = await hre.ethers.getContractFactory("MockUniswapV2Router");
+        
         MockEeseeFunder = await _MockEeseeFunder.deploy()
         await MockEeseeFunder.deployed()
 
-        const mockPresale = await _privateSale.deploy(125000000000000, oneAddress, oneAddress, oneAddress, 1000000000, 200000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
-        await mockPresale.deployed()
-
-        const mockPrivateSale = await _privateSale.deploy(71428571428571, oneAddress, oneAddress, oneAddress, 14000000000, 1660000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
-        await mockPrivateSale.deployed()
-
         ESE = await _ESE.deploy(
-            '2000000000000000000000000', 
-            '50000000000000000000000000', 
-            mockPresale.address, 
-            31536000, 
-            '90000000000000000000000000', 
-            mockPrivateSale.address, 
-            10, 
-            5184000
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 10000,
+                beneficiaries: [{addr: signer.address, amount: '2000000000000000000000000'}]
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            },
+            {
+                cliff: 0,
+                duration: 0,
+                TGEMintShare: 0,
+                beneficiaries: []
+            }
         )
 
         await ESE.deployed()
@@ -145,7 +167,7 @@ const {
         assert.equal(listing.maxTickets, 100, "maxTickets is correct")
         assert.equal(listing.ticketPrice, 2, "ticketPrice is correct")
         assert.equal(listing.ticketsBought, 0, "ticketsBought is correct")
-        assert.equal(listing.fee, '100000000000000000', "fee is correct")
+        assert.equal(listing.fee, '60000000000000000', "fee is correct")
         //assert.equal(listing.creationTime, timeNow, "creationTime is correct")
         assert.equal(listing.duration, 86400, "duration is correct")
         assert.equal(listing.winner, zeroAddress, "winner is correct")
@@ -955,7 +977,7 @@ const {
         assert.equal((await ERC20.balanceOf(mockVRF.address)).toString(), ethers.utils.parseEther('1').toString(), "Transferred tokens are correct")
 
         await MockEeseeFunder.connect(signer).fund(eesee.address, {value: ethers.utils.parseEther('1')})
-        //adjust token ration iside of mock router, make it output lower
+        //adjust token ratio inside of mock router, make it output lower
         await mockUniswapV2Router.adjust(ethers.utils.parseEther('0.98'))
         await expect(eesee.fund(0, ethers.utils.parseEther('1'))).to.be.revertedWithCustomError(eesee, "InvalidAmount")
     })
