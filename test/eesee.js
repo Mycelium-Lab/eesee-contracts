@@ -20,6 +20,7 @@ const {
     let mock1InchExecutor
     let mock1InchRouter
     let mockUniswapV2Router
+    let MockEeseeFunder
     //after one year
     const zeroAddress = "0x0000000000000000000000000000000000000000"
     const oneAddress = "0x0000000000000000000000000000000000000001"
@@ -39,6 +40,9 @@ const {
         const _mockUniswapV2Router = await hre.ethers.getContractFactory("MockUniswapV2Router");
         const _privateSale = await hre.ethers.getContractFactory('ESECrowdsale')
         const _mockAggregator = await hre.ethers.getContractFactory('MockAggregator')
+        const _MockEeseeFunder = await hre.ethers.getContractFactory('MockEeseeFunder')
+        MockEeseeFunder = await _MockEeseeFunder.deploy()
+        await MockEeseeFunder.deployed()
 
         const mockPresale = await _privateSale.deploy(125000000000000, oneAddress, oneAddress, oneAddress, 1000000000, 200000000000, 9999999999, 99999999991, '0x0000000000000000000000000000000000000000000000000000000000000000')
         await mockPresale.deployed()
@@ -943,19 +947,14 @@ const {
         assert.equal(BigInt(collectorBalanceAfter) - BigInt(collectorBalanceBefore), expectedReceive, "Amount collected is correct")
     })
     it('trades for link', async () => {
-        const tx = {
-            from: signer.address,
-            to: eesee.address,
-            value: ethers.utils.parseEther('1'),
-          }
-        await signer.sendTransaction(tx)
+        await MockEeseeFunder.connect(signer).fund(eesee.address, {value: ethers.utils.parseEther('1')})
         await expect(eesee.fund(0, ethers.utils.parseEther('1.1'))).to.be.revertedWithCustomError(eesee, "InsufficientETH")
         await expect(eesee.fund(0,0)).to.be.revertedWithCustomError(eesee, "InvalidAmount")
 
         await eesee.fund(0, ethers.utils.parseEther('1'))
         assert.equal((await ERC20.balanceOf(mockVRF.address)).toString(), ethers.utils.parseEther('1').toString(), "Transferred tokens are correct")
 
-        await signer.sendTransaction(tx)
+        await MockEeseeFunder.connect(signer).fund(eesee.address, {value: ethers.utils.parseEther('1')})
         //adjust token ration iside of mock router, make it output lower
         await mockUniswapV2Router.adjust(ethers.utils.parseEther('0.98'))
         await expect(eesee.fund(0, ethers.utils.parseEther('1'))).to.be.revertedWithCustomError(eesee, "InvalidAmount")
