@@ -1,325 +1,339 @@
 # Solidity API
 
-## ESECrowdsale
-
-_Functionality is adapted from OpenZeppelin's Crowdsale contracts._
-
-### ESE
-
-```solidity
-contract IERC20 ESE
-```
-
-_The token being sold_
-
-### token
-
-```solidity
-contract IERC20 token
-```
-
-_The token being bought_
-
-### wallet
-
-```solidity
-address wallet
-```
-
-_Address where funds are collected_
-
-### rate
-
-```solidity
-uint256 rate
-```
-
-_How many token units a buyer gets per wei.
-        The rate is the conversion between wei and the smallest and indivisible token unit.
-        So, if you are using a rate of 1 with a ERC20Detailed token with 3 decimals called TOK
-        1 wei will give you 1 unit, or 0.001 TOK._
-
-### minSellAmount
-
-```solidity
-uint256 minSellAmount
-```
-
-_Minimum/Maximum amounts of tokens that can be bought by a single account.(in ESE)_
-
-### maxSellAmount
-
-```solidity
-uint256 maxSellAmount
-```
-
-### openingTime
-
-```solidity
-uint256 openingTime
-```
-
-_The time when this crowdsale opens/closes._
-
-### closingTime
-
-```solidity
-uint256 closingTime
-```
-
-### whitelistMerkleRoot
-
-```solidity
-bytes32 whitelistMerkleRoot
-```
-
-_Whitelist Merkle Root. If == bytes32(0) everyone is whitelisted._
-
-### constructor
-
-```solidity
-constructor(uint256 _rate, address _wallet, contract IERC20 _ESE, contract IERC20 _token, uint256 _minSellAmount, uint256 _maxSellAmount, uint256 _openingTime, uint256 _closingTime, bytes32 _whitelistMerkleRoot) public
-```
-
-### isOpen
-
-```solidity
-function isOpen() public view returns (bool)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - {true} if the crowdsale is open, {false} otherwise. |
-
-### hasClosed
-
-```solidity
-function hasClosed() public view returns (bool)
-```
-
-_Checks whether the period in which the crowdsale is open has already elapsed._
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - Whether crowdsale period has elapsed |
-
-### isWhitelisted
-
-```solidity
-function isWhitelisted(address _address, bytes32[] merkleProof) public view returns (bool)
-```
-
-_Verifies that {_address} is whitelisted. If no {whitelistMerkleRoot} provided, everyone is whitelisted._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _address | address | - Address to verify claim for. |
-| merkleProof | bytes32[] | - Merkle Proof to verify. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | bool - Is whitelisted. |
-
-### buyESE
-
-```solidity
-function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensSpent)
-```
-
-_Buy ESE tokens from this contract. Forwards collected funds to {wallet}._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| beneficiary | address | Recipient of the token purchase. |
-| amount | uint256 | Amount of ESE to buy. |
-| merkleProof | bytes32[] | Merkle Proof required for this purchase. |
-
-### changeWallet
-
-```solidity
-function changeWallet(address _wallet) external
-```
-
-_Changes wallet. Emits {ChangeWallet} event._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _wallet | address | - New wallet. Note: This function can only be called by owner. |
-
-### extendTime
-
-```solidity
-function extendTime(uint256 _closingTime) external
-```
-
-_Extend crowdsale._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| _closingTime | uint256 | Crowdsale closing time |
-
 ## ESE
 
-### presale
+_Implementation of the {IERC20} interface for eesee with automatic vesting mechanism._
+
+### Beneficiary
 
 ```solidity
-contract IESECrowdsale presale
+struct Beneficiary {
+  uint256 amount;
+  address addr;
+}
 ```
 
-_Presale contract._
-
-### presaleStart
+### VestingParams
 
 ```solidity
-uint256 presaleStart
+struct VestingParams {
+  uint256 amount;
+  uint256 cliff;
+  uint256 duration;
+  mapping(address => uint256) amounts;
+}
 ```
 
-_Presale start timestamp._
-
-### presaleUnlockTime
+### ConstructorVestingParams
 
 ```solidity
-uint256 presaleUnlockTime
+struct ConstructorVestingParams {
+  uint256 cliff;
+  uint256 duration;
+  uint256 TGEMintShare;
+  struct ESE.Beneficiary[] beneficiaries;
+}
 ```
 
-_Time in which tokens will be unlocked._
-
-### privateSale
+### vestingStages
 
 ```solidity
-contract IESECrowdsale privateSale
+struct ESE.VestingParams[] vestingStages
 ```
 
-_Private sale contract._
+_Vesting parameters._
 
-### privateSaleStart
+### TGE
 
 ```solidity
-uint256 privateSaleStart
+uint256 TGE
 ```
 
-_Presale start timestamp._
-
-### privateSalePeriods
-
-```solidity
-uint256 privateSalePeriods
-```
-
-_Periods over which tokens will be unlocked._
-
-### privateSalePeriodTime
-
-```solidity
-uint256 privateSalePeriodTime
-```
-
-_Duration of each period._
-
-### lockPrivateSale
-
-```solidity
-bool lockPrivateSale
-```
-
-_False if ignore lock mechanism on private sales_
-
-### InvalidAmount
-
-```solidity
-error InvalidAmount()
-```
-
-### InvalidCrowdsale
-
-```solidity
-error InvalidCrowdsale()
-```
-
-### TransferingLockedTokens
-
-```solidity
-error TransferingLockedTokens(uint256 tokensLocked)
-```
+_Token generation event._
 
 ### constructor
 
 ```solidity
-constructor(uint256 amount, uint256 _presaleAmount, contract IESECrowdsale _presale, uint256 _presaleUnlockTime, uint256 _privateSaleAmount, contract IESECrowdsale _privateSale, uint256 _privateSalePeriods, uint256 _privateSalePeriodTime) public
+constructor(struct ESE.ConstructorVestingParams[] _vestingStages) public
 ```
 
-### lockedAmount
+### name
 
 ```solidity
-function lockedAmount(address _address) external view returns (uint256)
+function name() external view returns (string)
 ```
 
-_Returns locked tokens for an {_address}._
+_Returns the name of the token._
+
+### symbol
+
+```solidity
+function symbol() external view returns (string)
+```
+
+_Returns the symbol of the token, usually a shorter version of the
+name._
+
+### decimals
+
+```solidity
+function decimals() external pure returns (uint8)
+```
+
+_Returns the number of decimals used to get its user representation.
+For example, if `decimals` equals `2`, a balance of `505` tokens should
+be displayed to a user as `5.05` (`505 / 10 ** 2`).
+
+NOTE: This information is only used for _display_ purposes: it in
+no way affects any of the arithmetic of the contract, including
+{IERC20-balanceOf} and {IERC20-transfer}._
+
+### totalSupply
+
+```solidity
+function totalSupply() external view returns (uint256)
+```
+
+_See {IERC20-totalSupply}._
+
+### balanceOf
+
+```solidity
+function balanceOf(address account) external view returns (uint256)
+```
+
+_See {IERC20-balanceOf}._
+
+### totalVestedAmount
+
+```solidity
+function totalVestedAmount(uint256 stage) external view returns (uint256)
+```
+
+_Info on how many tokens have already been vested during 3 vesting periods in total._
+
+### vestedAmount
+
+```solidity
+function vestedAmount(uint256 stage, address account) external view returns (uint256)
+```
+
+_Info on how many tokens have already been vested during 3 vesting periods for account._
+
+### transfer
+
+```solidity
+function transfer(address to, uint256 amount) external returns (bool)
+```
+
+_See {IERC20-transfer}.
+
+Requirements:
+
+- `to` cannot be the zero address.
+- the caller must have a balance of at least `amount`._
+
+### allowance
+
+```solidity
+function allowance(address owner, address spender) public view returns (uint256)
+```
+
+_See {IERC20-allowance}._
+
+### approve
+
+```solidity
+function approve(address spender, uint256 amount) external returns (bool)
+```
+
+_See {IERC20-approve}.
+
+NOTE: If `amount` is the maximum `uint256`, the allowance is not updated on
+`transferFrom`. This is semantically equivalent to an infinite approval.
+
+Requirements:
+
+- `spender` cannot be the zero address._
+
+### transferFrom
+
+```solidity
+function transferFrom(address from, address to, uint256 amount) external returns (bool)
+```
+
+_See {IERC20-transferFrom}.
+
+Emits an {Approval} event indicating the updated allowance. This is not
+required by the EIP. See the note at the beginning of {ERC20}.
+
+NOTE: Does not update the allowance if the current allowance
+is the maximum `uint256`.
+
+Requirements:
+
+- `from` and `to` cannot be the zero address.
+- `from` must have a balance of at least `amount`.
+- the caller must have allowance for ``from``'s tokens of at least
+`amount`._
+
+### increaseAllowance
+
+```solidity
+function increaseAllowance(address spender, uint256 addedValue) external returns (bool)
+```
+
+_Atomically increases the allowance granted to `spender` by the caller.
+
+This is an alternative to {approve} that can be used as a mitigation for
+problems described in {IERC20-approve}.
+
+Emits an {Approval} event indicating the updated allowance.
+
+Requirements:
+
+- `spender` cannot be the zero address._
+
+### decreaseAllowance
+
+```solidity
+function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool)
+```
+
+_Atomically decreases the allowance granted to `spender` by the caller.
+
+This is an alternative to {approve} that can be used as a mitigation for
+problems described in {IERC20-approve}.
+
+Emits an {Approval} event indicating the updated allowance.
+
+Requirements:
+
+- `spender` cannot be the zero address.
+- `spender` must have allowance for the caller of at least
+`subtractedValue`._
+
+### _transfer
+
+```solidity
+function _transfer(address from, address to, uint256 amount) internal
+```
+
+_Moves `amount` of tokens from `from` to `to`.
+
+This internal function is equivalent to {transfer}, and can be used to
+e.g. implement automatic token fees, slashing mechanisms, etc.
+
+Emits a {Transfer} event.
+
+Requirements:
+
+- `from` cannot be the zero address.
+- `to` cannot be the zero address.
+- `from` must have a balance of at least `amount`._
+
+### _mint
+
+```solidity
+function _mint(address account, uint256 amount) internal
+```
+
+_Creates `amount` tokens and assigns them to `account`, increasing
+the total supply.
+
+Emits a {Transfer} event with `from` set to the zero address.
+
+Requirements:
+
+- `account` cannot be the zero address._
+
+### _approve
+
+```solidity
+function _approve(address owner, address spender, uint256 amount) internal
+```
+
+_Sets `amount` as the allowance of `spender` over the `owner` s tokens.
+
+This internal function is equivalent to `approve`, and can be used to
+e.g. set automatic allowances for certain subsystems, etc.
+
+Emits an {Approval} event.
+
+Requirements:
+
+- `owner` cannot be the zero address.
+- `spender` cannot be the zero address._
+
+### _spendAllowance
+
+```solidity
+function _spendAllowance(address owner, address spender, uint256 amount) internal
+```
+
+_Updates `owner` s allowance for `spender` based on spent `amount`.
+
+Does not update the allowance amount in case of infinite allowance.
+Revert if not enough allowance is available.
+
+Might emit an {Approval} event._
+
+### _initCrowdsaleParams
+
+```solidity
+function _initCrowdsaleParams(struct ESE.ConstructorVestingParams crowdsaleParams) internal
+```
+
+### _totalReleasableAmount
+
+```solidity
+function _totalReleasableAmount() internal view returns (uint256 amount)
+```
+
+_Calculates the amount that has already vested but hasn't been released yet._
+
+### _totalVestedAmount
+
+```solidity
+function _totalVestedAmount(struct ESE.VestingParams vesting) internal view returns (uint256)
+```
+
+_Calculates the amount that has already vested for a given vesting period in total._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _address | address | - Address to check. |
+| vesting | struct ESE.VestingParams | - Vesting period to check. |
 
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | uint256 | uint256 - Amount of tokens locked. |
-
-### available
+### _releasableAmount
 
 ```solidity
-function available(address _address) external view returns (uint256)
+function _releasableAmount(address account) internal view returns (uint256 amount)
 ```
 
-_Returns tokens available for an {_address} to transfer._
+_Calculates the amount that has already vested but hasn't been released yet for an account._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _address | address | - Address to check. |
+| account | address | - Address to check. |
 
-#### Return Values
+### _vestedAmount
+
+```solidity
+function _vestedAmount(struct ESE.VestingParams vesting, address account) internal view returns (uint256)
+```
+
+_Calculates the amount that has already vested for a given vesting period for an account._
+
+#### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| [0] | uint256 | uint256 - Amount of tokens available. |
-
-### _beforeTokenTransfer
-
-```solidity
-function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual
-```
-
-_Hook that is called before any transfer of tokens. This includes
-minting and burning.
-
-Calling conditions:
-
-- when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
-will be transferred to `to`.
-- when `from` is zero, `amount` tokens will be minted for `to`.
-- when `to` is zero, `amount` of ``from``'s tokens will be burned.
-- `from` and `to` are never both zero.
-
-To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks]._
+| vesting | struct ESE.VestingParams | - Vesting period to check. |
+| account | address | - Address to check. |
 
 ## eeseeMinter
 
@@ -812,6 +826,14 @@ contract IERC20 ESE
 
 _ESE token this contract uses._
 
+### staking
+
+```solidity
+contract IeeseeStaking staking
+```
+
+_Eesee staking contract. Tracks volume for this contract._
+
 ### minter
 
 ```solidity
@@ -848,15 +870,23 @@ _Max tickets bought by a single address in a single listing. [1 ether == 100%]_
 uint256 fee
 ```
 
-_Fee that is collected to {feeCollector} from each fulfilled listing. [1 ether == 100%]_
+_Fee that is collected to {feeSplitter} from each fulfilled listing. [1 ether == 100%]_
 
-### feeCollector
+### feeSplitter
 
 ```solidity
-address feeCollector
+address feeSplitter
 ```
 
-_Address {fee}s are sent to._
+_Address the {fee}s are sent to._
+
+### chainlinkFeeShare
+
+```solidity
+uint256 chainlinkFeeShare
+```
+
+_The fee for chainlink VRF is shared between ticket buyers & eesee team. [1 ether == 100%]_
 
 ### LINK
 
@@ -906,6 +936,20 @@ contract IRoyaltyEngineV1 royaltyEngine
 
 _The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract._
 
+### UniswapV2Router
+
+```solidity
+contract IUniswapV2Router01 UniswapV2Router
+```
+
+_UniswapV2 router is used for ETH => LINK conversions. We use UniswapV2 with predefined {route} to have as little contol over ETH as possible._
+
+### route
+
+```solidity
+address[] route
+```
+
 ### OneInchRouter
 
 ```solidity
@@ -923,7 +967,7 @@ receive() external payable
 ### constructor
 
 ```solidity
-constructor(contract IERC20 _ESE, contract IeeseeMinter _minter, address _feeCollector, contract IRoyaltyEngineV1 _royaltyEngine, address _vrfCoordinator, contract LinkTokenInterface _LINK, bytes32 _keyHash, uint16 _minimumRequestConfirmations, uint32 _callbackGasLimit, address _OneInchRouter) public
+constructor(contract IERC20 _ESE, contract IeeseeStaking _staking, contract IeeseeMinter _minter, address _feeSplitter, contract IRoyaltyEngineV1 _royaltyEngine, struct Ieesee.ChainlinkContructorArgs chainlinkArgs, address _WETH, contract IUniswapV2Router01 _UniswapV2Router, address _OneInchRouter) public
 ```
 
 ### listItem
@@ -1087,7 +1131,7 @@ _Deploys new NFT collection contract, mints NFTs to it and lists them. Emits {Li
 ### buyTickets
 
 ```solidity
-function buyTickets(uint256 ID, uint256 amount) external returns (uint256 tokensSpent)
+function buyTickets(uint256 ID, uint256 amount) external payable returns (uint256 tokensSpent)
 ```
 
 _Buys tickets to participate in a draw. Requests Chainlink to generate random words if all tickets have been bought. Emits {BuyTicket} event for each ticket bought._
@@ -1103,7 +1147,7 @@ _Buys tickets to participate in a draw. Requests Chainlink to generate random wo
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| tokensSpent | uint256 | - ESE tokens spent. |
+| tokensSpent | uint256 | - ESE tokens spent.         Note: {chainlinkFee(ID, amount)} of ETH must be sent with this transaction to pay for Chainlink VRF call. |
 
 ### buyTicketsWithSwap
 
@@ -1125,7 +1169,7 @@ _Buys tickets with any token using 1inch'es router and swapping it for ESE. Requ
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | tokensSpent | uint256 | - Tokens spent. |
-| ticketsBought | uint256 | - Tickets bought. |
+| ticketsBought | uint256 | - Tickets bought.         Note: Additionaly {chainlinkFee(ID, amount)} of ETH must be sent with this transaction to pay for Chainlink VRF call. |
 
 ### listDrop
 
@@ -1248,7 +1292,7 @@ _Reclaim NFTs from expired listings. Emits {ReclaimItem} event for each listing 
 ### batchReclaimTokens
 
 ```solidity
-function batchReclaimTokens(uint256[] IDs, address recipient) external returns (uint256 amount)
+function batchReclaimTokens(uint256[] IDs, address recipient) external returns (uint256 amount, uint256 chainlinkFeeRefund)
 ```
 
 _Reclaim ESE from expired listings. Emits {ReclaimTokens} event for each listing ID._
@@ -1265,6 +1309,28 @@ _Reclaim ESE from expired listings. Emits {ReclaimTokens} event for each listing
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | amount | uint256 | - ESE received. |
+| chainlinkFeeRefund | uint256 | - Chainlink refund received |
+
+### chainlinkFee
+
+```solidity
+function chainlinkFee(uint256 ID, uint256 amount) public view returns (uint256)
+```
+
+_Additional ETH that needs to be passed with buyTickets to pay for Chainlink gas costs._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ID | uint256 | - ID of listing to check. |
+| amount | uint256 | - Amount of tickets to buy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - ETH gas amount that has to be paid for {amount} of tickets bought. |
 
 ### getListingsLength
 
@@ -1431,24 +1497,24 @@ _Changes fee. Emits {ChangeFee} event._
 | ---- | ---- | ----------- |
 | _fee | uint256 | - New fee. Note: This function can only be called by owner. |
 
-### changeFeeCollector
+### changeChainlinkFeeShare
 
 ```solidity
-function changeFeeCollector(address _feeCollector) external
+function changeChainlinkFeeShare(uint256 _chainlinkFeeShare) external
 ```
 
-_Changes feeCollector. Emits {ChangeFeeCollector} event._
+_Changes chainlinkFeeShare. Emits {ChangeChainlinkFeeShare} event._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| _feeCollector | address | - New feeCollector. Note: This function can only be called by owner. |
+| _chainlinkFeeShare | uint256 | - New chainlink fee share. Note: This function can only be called by owner. |
 
 ### fund
 
 ```solidity
-function fund(uint96 amount) external
+function fund(uint256 amount, uint256 amountETH) external returns (uint256)
 ```
 
 _Fund function for Chainlink's VRF V2 subscription._
@@ -1457,9 +1523,154 @@ _Fund function for Chainlink's VRF V2 subscription._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| amount | uint96 | - Amount of LINK to fund subscription with. |
+| amount | uint256 | - Amount of LINK to fund subscription with. |
+| amountETH | uint256 | - Amount of ETH to swap using Uniswap. |
 
-## eeseePool
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Amount funded |
+
+## eeseeFeeSplitter
+
+### ESE
+
+```solidity
+contract IERC20 ESE
+```
+
+_ESE token._
+
+### companyTreasury
+
+```solidity
+struct eeseeFeeSplitter.FeeInfo companyTreasury
+```
+
+_Company treasury address & fee share Note: Cannot be more than 50%._
+
+### miningPool
+
+```solidity
+struct eeseeFeeSplitter.FeeInfo miningPool
+```
+
+_Mining pool address & fee share._
+
+### daoTreasury
+
+```solidity
+struct eeseeFeeSplitter.FeeInfo daoTreasury
+```
+
+_Dao treasury address & fee share._
+
+### stakingPool
+
+```solidity
+struct eeseeFeeSplitter.FeeInfo stakingPool
+```
+
+_Staking pool address & fee share._
+
+### FeeInfo
+
+```solidity
+struct FeeInfo {
+  address addr;
+  uint256 share;
+}
+```
+
+### SetShares
+
+```solidity
+event SetShares(uint256 newCompanyTreasuryShare, uint256 newMiningPoolShare, uint256 newDaoTreasuryShare, uint256 newStakingPoolShare)
+```
+
+### SplitFees
+
+```solidity
+event SplitFees(address companyTreasuryAddress, uint256 companyTreasuryAmount, uint256 miningPoolAmount, uint256 daoTreasuryAmount, uint256 stakingPoolAmount)
+```
+
+### SetCompanyTreasuryAddress
+
+```solidity
+event SetCompanyTreasuryAddress(address previousCompanyTreasury, address newCompanyTreasury)
+```
+
+### ZeroBalance
+
+```solidity
+error ZeroBalance()
+```
+
+### InvalidShares
+
+```solidity
+error InvalidShares()
+```
+
+### InvalidAddress
+
+```solidity
+error InvalidAddress()
+```
+
+### InvalidCompanyTreasuryShare
+
+```solidity
+error InvalidCompanyTreasuryShare()
+```
+
+### constructor
+
+```solidity
+constructor(address _ESE, struct eeseeFeeSplitter.FeeInfo _companyTreasury, struct eeseeFeeSplitter.FeeInfo _miningPool, struct eeseeFeeSplitter.FeeInfo _daoTreasury, struct eeseeFeeSplitter.FeeInfo _stakingPool) public
+```
+
+### splitFees
+
+```solidity
+function splitFees() external
+```
+
+_Splits fees between mining pool, dao treasury, staking pool and company treasury._
+
+### setShares
+
+```solidity
+function setShares(uint256 companyTreasuryShare, uint256 miningPoolShare, uint256 daoTreasuryShare, uint256 stakingPoolShare) public
+```
+
+_Sets fee shares percentage shares._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| companyTreasuryShare | uint256 | - New company treasury share. |
+| miningPoolShare | uint256 | - New mining pool share. |
+| daoTreasuryShare | uint256 | - New dao treasury share. |
+| stakingPoolShare | uint256 | - New staking pool share. |
+
+### setCompanyTreasuryAddress
+
+```solidity
+function setCompanyTreasuryAddress(address newCompanyTreasury) external
+```
+
+_Sets company treasury address._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| newCompanyTreasury | address | - New company treasury address. |
+
+## eeseeMining
 
 ### Claim
 
@@ -1536,7 +1747,7 @@ constructor(contract IERC20 _rewardToken) public
 ### claimRewards
 
 ```solidity
-function claimRewards(struct eeseePool.Claim[] claims) external
+function claimRewards(struct eeseeMining.Claim[] claims) external
 ```
 
 _Claims rewards for multiple {rewardID}s. Emits {RewardClaimed} event for each reward claimed._
@@ -1545,7 +1756,7 @@ _Claims rewards for multiple {rewardID}s. Emits {RewardClaimed} event for each r
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| claims | struct eeseePool.Claim[] | - Claim structs. |
+| claims | struct eeseeMining.Claim[] | - Claim structs. |
 
 ### addReward
 
@@ -1564,7 +1775,7 @@ _Adds new merkle root and advances to the next {rewardID}. Emits {RewardAdded} e
 ### getRewards
 
 ```solidity
-function getRewards(address claimer, struct eeseePool.Claim[] claims) external view returns (uint256 rewards)
+function getRewards(address claimer, struct eeseeMining.Claim[] claims) external view returns (uint256 rewards)
 ```
 
 _Verifies {claims} and returns rewards to be claimed from {claims}._
@@ -1574,7 +1785,7 @@ _Verifies {claims} and returns rewards to be claimed from {claims}._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | claimer | address | - Address to check. |
-| claims | struct eeseePool.Claim[] | - Claims to check. |
+| claims | struct eeseeMining.Claim[] | - Claims to check. |
 
 #### Return Values
 
@@ -1585,7 +1796,7 @@ _Verifies {claims} and returns rewards to be claimed from {claims}._
 ### verifyClaim
 
 ```solidity
-function verifyClaim(address claimer, struct eeseePool.Claim claim) public view returns (bool)
+function verifyClaim(address claimer, struct eeseeMining.Claim claim) public view returns (bool)
 ```
 
 _Verifies {claim} for {claimer}._
@@ -1595,13 +1806,340 @@ _Verifies {claim} for {claimer}._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | claimer | address | - Address to verify claim for. |
-| claim | struct eeseePool.Claim | - Claim to verify. |
+| claim | struct eeseeMining.Claim | - Claim to verify. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | [0] | bool | bool - Does {claim} exist in merkle root. |
+
+## eeseeStaking
+
+### ESE
+
+```solidity
+contract IERC20 ESE
+```
+
+_ESE token to use in staking._
+
+### eesee
+
+```solidity
+address eesee
+```
+
+_eesee marketplace contract to track volume changes._
+
+### tierData
+
+```solidity
+struct IeeseeStaking.TierData[] tierData
+```
+
+_Tier data describing volume breakpoints & rewardRates._
+
+### volume
+
+```solidity
+mapping(address => uint256) volume
+```
+
+_Volume for each user on eesee marketplace._
+
+### stakersFlexible
+
+```solidity
+mapping(address => struct IeeseeStaking.StakerDataFlexible) stakersFlexible
+```
+
+_Data for each staker._
+
+### stakersLocked
+
+```solidity
+mapping(address => struct IeeseeStaking.StakerDataLocked) stakersLocked
+```
+
+### duration
+
+```solidity
+uint256 duration
+```
+
+_Min locked staking duration._
+
+### maxStakesLocked
+
+```solidity
+uint256 maxStakesLocked
+```
+
+_Maximum amount of locked stakes that can be staked at one time._
+
+### constructor
+
+```solidity
+constructor(address _ESE, address _eesee, struct IeeseeStaking.TierData[] _tierData) public
+```
+
+### stakeFlexible
+
+```solidity
+function stakeFlexible(uint256 amount) external
+```
+
+_Stakes ESE token using flexible staking scheme. The staker can withdraw tokens anytime using {unstakeFlexible} function._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of ESE tokens to stake. |
+
+### unstakeFlexible
+
+```solidity
+function unstakeFlexible(uint256 amount, address recipient) external returns (uint256 ESEReceived)
+```
+
+_Unstakes ESE token from flexible staking and sends them to {recipient}. Also sends reward tokens. Pass 0 to {amount} to only receive rewards._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of ESE tokens to unstake. |
+| recipient | address | - Tokens receiver. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ESEReceived | uint256 | - ESE tokens sent. |
+
+### earnedFlexible
+
+```solidity
+function earnedFlexible(address staker) external view returns (uint256)
+```
+
+_Returns how many reward tokens were earned by {staker} from flexible staking._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| staker | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Amount of reward tokens ready to be collected. |
+
+### rewardRateFlexible
+
+```solidity
+function rewardRateFlexible(address _address) public view returns (uint256)
+```
+
+_Returns reward per second per token staked for {_address} for flexible staking._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Reward per second per token staked. |
+
+### _calculateRewardFlexible
+
+```solidity
+function _calculateRewardFlexible(address _address) internal view returns (uint256)
+```
+
+### stakeLocked
+
+```solidity
+function stakeLocked(uint256 amount) external
+```
+
+_Stakes ESE token using locked staking scheme. The staker can only withdraw tokens after {duration} has passed._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of ESE tokens to stake. Note: Staker can only have {maxStakesLocked} stakes at one single time. Reverts if more is staked before any other one expires. |
+
+### unstakeLocked
+
+```solidity
+function unstakeLocked(uint256 amount, address recipient) external returns (uint256 ESEReceived)
+```
+
+_Unstakes ESE token from locked staking and sends them to {recipient}. Also sends reward tokens. Pass 0 to {amount} to only receive rewards._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | - Amount of ESE tokens to unstake. |
+| recipient | address | - Tokens receiver. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ESEReceived | uint256 | - ESE tokens sent. |
+
+### stakeUnlocked
+
+```solidity
+function stakeUnlocked(address staker) external view returns (uint256 stake)
+```
+
+_Returns stakes unlocked for {staker}._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| staker | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| stake | uint256 | - Amount unlocked. |
+
+### getStakeLocked
+
+```solidity
+function getStakeLocked(address staker) external view returns (uint256 stake)
+```
+
+_Returns total stake for {staker}, unlocked + locked, without reward._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| staker | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| stake | uint256 | - Amount staked. |
+
+### earnedLocked
+
+```solidity
+function earnedLocked(address staker) external view returns (uint256 reward)
+```
+
+_Returns how many reward tokens were earned by {staker} from locked staking._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| staker | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| reward | uint256 | - Amount of reward tokens ready to be collected. |
+
+### stakesLocked
+
+```solidity
+function stakesLocked(address staker) external view returns (struct IeeseeStaking.StakesLocked[10] stakes)
+```
+
+_Returns all stakes of {staker} for locked staking._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| staker | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| stakes | struct IeeseeStaking.StakesLocked[10] | - All {staker}'s stakes. |
+
+### rewardRateLocked
+
+```solidity
+function rewardRateLocked(address _address) public view returns (uint256)
+```
+
+_Returns reward per second per token staked for {_address} for locked staking._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _address | address | - Address to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint256 | uint256 - Reward per second per token staked. |
+
+### _calculateRewardLocked
+
+```solidity
+function _calculateRewardLocked(address _address, uint256 stake) internal view returns (uint256)
+```
+
+### _updateLockedRewards
+
+```solidity
+function _updateLockedRewards(struct IeeseeStaking.StakerDataLocked staker) internal
+```
+
+### updateVolume
+
+```solidity
+function updateVolume(int256 delta, address _address) external
+```
+
+_Updates {_address}'s volume on eesee platform and rewards._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| delta | int256 | - Volume change. |
+| _address | address | - Address to update. Note: This function can only be called by eesee marketplace. |
+
+### changeDuration
+
+```solidity
+function changeDuration(uint256 _duration) external
+```
+
+_Changes duration. Emits {ChangeDuration} event._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _duration | uint256 | - New duration. Note: This function can only be called by owner. |
 
 ## IAggregationRouterV5
 
@@ -1623,182 +2161,6 @@ struct SwapDescription {
 
 ```solidity
 function swap(address executor, struct IAggregationRouterV5.SwapDescription desc, bytes permit, bytes data) external payable returns (uint256 returnAmount, uint256 spentAmount)
-```
-
-## IESECrowdsale
-
-### TokensPurchased
-
-```solidity
-event TokensPurchased(address purchaser, address beneficiary, uint256 value, uint256 amount)
-```
-
-### ChangeWallet
-
-```solidity
-event ChangeWallet(address previousWallet, address newWallet)
-```
-
-### TimedCrowdsaleExtended
-
-```solidity
-event TimedCrowdsaleExtended(uint256 previousClosingTime, uint256 newClosingTime)
-```
-
-### AlreadyClosed
-
-```solidity
-error AlreadyClosed(uint256 closingTime)
-```
-
-### NotOpen
-
-```solidity
-error NotOpen()
-```
-
-### NotWhitelisted
-
-```solidity
-error NotWhitelisted()
-```
-
-### InvalidBeneficiary
-
-```solidity
-error InvalidBeneficiary()
-```
-
-### InvalidRate
-
-```solidity
-error InvalidRate()
-```
-
-### InvalidWallet
-
-```solidity
-error InvalidWallet()
-```
-
-### InvalidESE
-
-```solidity
-error InvalidESE()
-```
-
-### InvalidOpeningTime
-
-```solidity
-error InvalidOpeningTime()
-```
-
-### InvalidClosingTime
-
-```solidity
-error InvalidClosingTime()
-```
-
-### InvalidToken
-
-```solidity
-error InvalidToken()
-```
-
-### InvalidMaxSellAmount
-
-```solidity
-error InvalidMaxSellAmount()
-```
-
-### SellAmountTooHigh
-
-```solidity
-error SellAmountTooHigh(uint256 maxSellAmount)
-```
-
-### SellAmountTooLow
-
-```solidity
-error SellAmountTooLow(uint256 minSellAmount)
-```
-
-### MinSellAmountTooHigh
-
-```solidity
-error MinSellAmountTooHigh(uint256 cap)
-```
-
-### ESE
-
-```solidity
-function ESE() external view returns (contract IERC20)
-```
-
-### token
-
-```solidity
-function token() external view returns (contract IERC20)
-```
-
-### wallet
-
-```solidity
-function wallet() external view returns (address)
-```
-
-### rate
-
-```solidity
-function rate() external view returns (uint256)
-```
-
-### minSellAmount
-
-```solidity
-function minSellAmount() external view returns (uint256)
-```
-
-### maxSellAmount
-
-```solidity
-function maxSellAmount() external view returns (uint256)
-```
-
-### openingTime
-
-```solidity
-function openingTime() external view returns (uint256)
-```
-
-### whitelistMerkleRoot
-
-```solidity
-function whitelistMerkleRoot() external view returns (bytes32)
-```
-
-### isOpen
-
-```solidity
-function isOpen() external view returns (bool)
-```
-
-### isWhitelisted
-
-```solidity
-function isWhitelisted(address _address, bytes32[] merkleProof) external view returns (bool)
-```
-
-### buyESE
-
-```solidity
-function buyESE(address beneficiary, uint256 amount, bytes32[] merkleProof) external returns (uint256 tokensBought)
-```
-
-### changeWallet
-
-```solidity
-function changeWallet(address _wallet) external
 ```
 
 ## IRoyaltyEngineV1
@@ -1836,6 +2198,122 @@ View only version of getRoyalty
 | tokenAddress | address | - The address of the token |
 | tokenId | uint256 | - The id of the token |
 | value | uint256 | - The value you wish to get the royalty of  returns Two arrays of equal length, royalty recipients and the corresponding amount each recipient should get |
+
+## IUniswapV2Router01
+
+### factory
+
+```solidity
+function factory() external pure returns (address)
+```
+
+### WETH
+
+```solidity
+function WETH() external pure returns (address)
+```
+
+### addLiquidity
+
+```solidity
+function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256 amountA, uint256 amountB, uint256 liquidity)
+```
+
+### addLiquidityETH
+
+```solidity
+function addLiquidityETH(address token, uint256 amountTokenDesired, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity)
+```
+
+### removeLiquidity
+
+```solidity
+function removeLiquidity(address tokenA, address tokenB, uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256 amountA, uint256 amountB)
+```
+
+### removeLiquidityETH
+
+```solidity
+function removeLiquidityETH(address token, uint256 liquidity, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline) external returns (uint256 amountToken, uint256 amountETH)
+```
+
+### removeLiquidityWithPermit
+
+```solidity
+function removeLiquidityWithPermit(address tokenA, address tokenB, uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline, bool approveMax, uint8 v, bytes32 r, bytes32 s) external returns (uint256 amountA, uint256 amountB)
+```
+
+### removeLiquidityETHWithPermit
+
+```solidity
+function removeLiquidityETHWithPermit(address token, uint256 liquidity, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline, bool approveMax, uint8 v, bytes32 r, bytes32 s) external returns (uint256 amountToken, uint256 amountETH)
+```
+
+### swapExactTokensForTokens
+
+```solidity
+function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline) external returns (uint256[] amounts)
+```
+
+### swapTokensForExactTokens
+
+```solidity
+function swapTokensForExactTokens(uint256 amountOut, uint256 amountInMax, address[] path, address to, uint256 deadline) external returns (uint256[] amounts)
+```
+
+### swapExactETHForTokens
+
+```solidity
+function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) external payable returns (uint256[] amounts)
+```
+
+### swapTokensForExactETH
+
+```solidity
+function swapTokensForExactETH(uint256 amountOut, uint256 amountInMax, address[] path, address to, uint256 deadline) external returns (uint256[] amounts)
+```
+
+### swapExactTokensForETH
+
+```solidity
+function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline) external returns (uint256[] amounts)
+```
+
+### swapETHForExactTokens
+
+```solidity
+function swapETHForExactTokens(uint256 amountOut, address[] path, address to, uint256 deadline) external payable returns (uint256[] amounts)
+```
+
+### quote
+
+```solidity
+function quote(uint256 amountA, uint256 reserveA, uint256 reserveB) external pure returns (uint256 amountB)
+```
+
+### getAmountOut
+
+```solidity
+function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) external pure returns (uint256 amountOut)
+```
+
+### getAmountIn
+
+```solidity
+function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut) external pure returns (uint256 amountIn)
+```
+
+### getAmountsOut
+
+```solidity
+function getAmountsOut(uint256 amountIn, address[] path) external view returns (uint256[] amounts)
+```
+
+### getAmountsIn
+
+```solidity
+function getAmountsIn(uint256 amountOut, address[] path) external view returns (uint256[] amounts)
+```
 
 ## Ieesee
 
@@ -1877,6 +2355,20 @@ struct Drop {
   contract IERC721 collection;
   address earningsCollector;
   uint256 fee;
+}
+```
+
+### ChainlinkContructorArgs
+
+```solidity
+struct ChainlinkContructorArgs {
+  address vrfCoordinator;
+  contract LinkTokenInterface LINK;
+  bytes32 keyHash;
+  uint256 keyHashGasLane;
+  uint16 minimumRequestConfirmations;
+  uint32 callbackGasLimit;
+  contract AggregatorV3Interface LINK_ETH_DataFeed;
 }
 ```
 
@@ -1964,10 +2456,10 @@ event ChangeMaxTicketsBoughtByAddress(uint256 previousMaxTicketsBoughtByAddress,
 event ChangeFee(uint256 previousFee, uint256 newFee)
 ```
 
-### ChangeFeeCollector
+### ChangeChainlinkFeeShare
 
 ```solidity
-event ChangeFeeCollector(address previousFeeColector, address newFeeCollector)
+event ChangeChainlinkFeeShare(uint256 previousChainlinkFeeShare, uint256 newChainlinkFeeShare)
 ```
 
 ### ListDrop
@@ -1980,6 +2472,12 @@ event ListDrop(uint256 ID, contract IERC721 collection, address earningsCollecto
 
 ```solidity
 event MintDrop(uint256 ID, struct Ieesee.NFT nft, address sender, uint256 mintFee)
+```
+
+### ChainlinkFunded
+
+```solidity
+event ChainlinkFunded(uint256 subscriptionID, uint256 amount)
 ```
 
 ### CallerNotOwner
@@ -2072,6 +2570,12 @@ error BuyAmountTooLow()
 error FeeTooHigh()
 ```
 
+### ChainlinkFeeTooHigh
+
+```solidity
+error ChainlinkFeeTooHigh()
+```
+
 ### MaxTicketsBoughtByAddressTooHigh
 
 ```solidity
@@ -2094,6 +2598,12 @@ error NoTicketsBought(uint256 ID)
 
 ```solidity
 error MaxTicketsBoughtByAddress(address _address)
+```
+
+### InvalidConstructor
+
+```solidity
+error InvalidConstructor()
 ```
 
 ### InvalidArrayLengths
@@ -2132,6 +2642,24 @@ error InvalidQuantity()
 error InvalidRecipient()
 ```
 
+### InvalidAnswer
+
+```solidity
+error InvalidAnswer()
+```
+
+### InvalidAmount
+
+```solidity
+error InvalidAmount()
+```
+
+### InsufficientETH
+
+```solidity
+error InsufficientETH()
+```
+
 ### SwapNotSuccessful
 
 ```solidity
@@ -2168,6 +2696,12 @@ function drops(uint256) external view returns (uint256 ID, contract IERC721 coll
 function ESE() external view returns (contract IERC20)
 ```
 
+### staking
+
+```solidity
+function staking() external view returns (contract IeeseeStaking)
+```
+
 ### minter
 
 ```solidity
@@ -2198,10 +2732,16 @@ function maxTicketsBoughtByAddress() external view returns (uint256)
 function fee() external view returns (uint256)
 ```
 
-### feeCollector
+### feeSplitter
 
 ```solidity
-function feeCollector() external view returns (address)
+function feeSplitter() external view returns (address)
+```
+
+### chainlinkFeeShare
+
+```solidity
+function chainlinkFeeShare() external view returns (uint256)
 ```
 
 ### LINK
@@ -2285,7 +2825,7 @@ function mintAndListItemsWithDeploy(string name, string symbol, string baseURI, 
 ### buyTickets
 
 ```solidity
-function buyTickets(uint256 ID, uint256 amount) external returns (uint256 tokensSpent)
+function buyTickets(uint256 ID, uint256 amount) external payable returns (uint256 tokensSpent)
 ```
 
 ### buyTicketsWithSwap
@@ -2327,7 +2867,13 @@ function batchReclaimItems(uint256[] IDs, address recipient) external returns (c
 ### batchReclaimTokens
 
 ```solidity
-function batchReclaimTokens(uint256[] IDs, address recipient) external returns (uint256 amount)
+function batchReclaimTokens(uint256[] IDs, address recipient) external returns (uint256 amount, uint256 chainlinkFeeRefund)
+```
+
+### chainlinkFee
+
+```solidity
+function chainlinkFee(uint256 ID, uint256 amount) external view returns (uint256)
 ```
 
 ### getListingsLength
@@ -2372,16 +2918,16 @@ function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) ext
 function changeFee(uint256 _fee) external
 ```
 
-### changeFeeCollector
+### changeChainlinkFeeShare
 
 ```solidity
-function changeFeeCollector(address _feeCollector) external
+function changeChainlinkFeeShare(uint256 _chainlinkFeeShare) external
 ```
 
 ### fund
 
 ```solidity
-function fund(uint96 amount) external
+function fund(uint256 amount, uint256 amountETH) external returns (uint256)
 ```
 
 ## IeeseeMinter
@@ -2593,6 +3139,245 @@ function verifyCanMint(uint8 saleStageIndex, address claimer, bytes32[] merklePr
 function mint(address recipient, uint256 quantity, bytes32[] merkleProof) external
 ```
 
+## IeeseeStaking
+
+### TierData
+
+```solidity
+struct TierData {
+  uint256 volumeBreakpoint;
+  uint256 rewardRateFlexible;
+  uint256 rewardRateLocked;
+}
+```
+
+### StakerDataFlexible
+
+```solidity
+struct StakerDataFlexible {
+  uint256 stake;
+  uint256 reward;
+  uint256 lastStakedTimestamp;
+}
+```
+
+### StakesLocked
+
+```solidity
+struct StakesLocked {
+  uint256 stake;
+  uint256 reward;
+  uint256 unlockTime;
+}
+```
+
+### StakerDataLocked
+
+```solidity
+struct StakerDataLocked {
+  struct IeeseeStaking.StakerDataFlexible stakerData;
+  struct IeeseeStaking.StakesLocked[10] stakes;
+}
+```
+
+### ESE
+
+```solidity
+function ESE() external view returns (contract IERC20)
+```
+
+### eesee
+
+```solidity
+function eesee() external view returns (address)
+```
+
+### volume
+
+```solidity
+function volume(address) external view returns (uint256)
+```
+
+### tierData
+
+```solidity
+function tierData(uint256) external view returns (uint256 volumeBreakpoint, uint256 flexibleRewardRate, uint256 lockedRewardRate)
+```
+
+### stakersFlexible
+
+```solidity
+function stakersFlexible(address) external view returns (uint256 stake, uint256 reward, uint256 lastStakedTimestamp)
+```
+
+### stakersLocked
+
+```solidity
+function stakersLocked(address) external view returns (struct IeeseeStaking.StakerDataFlexible stakerData)
+```
+
+### duration
+
+```solidity
+function duration() external view returns (uint256)
+```
+
+### InvalidAmount
+
+```solidity
+error InvalidAmount()
+```
+
+### InvalidStake
+
+```solidity
+error InvalidStake()
+```
+
+### InvalidRecipient
+
+```solidity
+error InvalidRecipient()
+```
+
+### InvalidDelta
+
+```solidity
+error InvalidDelta()
+```
+
+### InsufficientStake
+
+```solidity
+error InsufficientStake()
+```
+
+### InsufficientReward
+
+```solidity
+error InsufficientReward()
+```
+
+### TooManyLockedStakes
+
+```solidity
+error TooManyLockedStakes()
+```
+
+### CallerNotEesee
+
+```solidity
+error CallerNotEesee()
+```
+
+### StakeFlexible
+
+```solidity
+event StakeFlexible(address staker, uint256 amount)
+```
+
+### UnstakeFlexible
+
+```solidity
+event UnstakeFlexible(address staker, address recipient, uint256 amount)
+```
+
+### StakeLocked
+
+```solidity
+event StakeLocked(address staker, uint256 amount, uint256 unlockTime)
+```
+
+### UnstakeLocked
+
+```solidity
+event UnstakeLocked(address staker, address recipient, uint256 amount)
+```
+
+### ChangeDuration
+
+```solidity
+event ChangeDuration(uint256 previousDuration, uint256 newDuration)
+```
+
+### stakeFlexible
+
+```solidity
+function stakeFlexible(uint256 amount) external
+```
+
+### unstakeFlexible
+
+```solidity
+function unstakeFlexible(uint256 amount, address recipient) external returns (uint256 ESEReceived)
+```
+
+### earnedFlexible
+
+```solidity
+function earnedFlexible(address staker) external view returns (uint256)
+```
+
+### rewardRateFlexible
+
+```solidity
+function rewardRateFlexible(address _address) external view returns (uint256)
+```
+
+### stakeLocked
+
+```solidity
+function stakeLocked(uint256 amount) external
+```
+
+### unstakeLocked
+
+```solidity
+function unstakeLocked(uint256 amount, address recipient) external returns (uint256 ESEReceived)
+```
+
+### stakeUnlocked
+
+```solidity
+function stakeUnlocked(address staker) external view returns (uint256 stake)
+```
+
+### getStakeLocked
+
+```solidity
+function getStakeLocked(address staker) external view returns (uint256 stake)
+```
+
+### earnedLocked
+
+```solidity
+function earnedLocked(address staker) external view returns (uint256)
+```
+
+### stakesLocked
+
+```solidity
+function stakesLocked(address staker) external view returns (struct IeeseeStaking.StakesLocked[10] stakes)
+```
+
+### rewardRateLocked
+
+```solidity
+function rewardRateLocked(address _address) external view returns (uint256)
+```
+
+### updateVolume
+
+```solidity
+function updateVolume(int256 delta, address _address) external
+```
+
+### changeDuration
+
+```solidity
+function changeDuration(uint256 _duration) external
+```
+
 ## Mock1InchExecutor
 
 ### constructor
@@ -2753,12 +3538,44 @@ _router keeps 1 wei of every token on the contract balance for gas optimisations
 | returnAmount | uint256 | Resulting token amount |
 | spentAmount | uint256 | Source token amount |
 
+## MockAggregator
+
+### latestRoundData
+
+```solidity
+function latestRoundData() external pure returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
+```
+
 ## MockERC20
 
 ### constructor
 
 ```solidity
 constructor(uint256 amount) public
+```
+
+### decimals
+
+```solidity
+function decimals() public pure returns (uint8)
+```
+
+_Returns the number of decimals used to get its user representation.
+For example, if `decimals` equals `2`, a balance of `505` tokens should
+be displayed to a user as `5.05` (`505 / 10 ** 2`).
+
+Tokens usually opt for a value of 18, imitating the relationship between
+Ether and Wei. This is the value {ERC20} uses, unless this function is
+overridden;
+
+NOTE: This information is only used for _display_ purposes: it in
+no way affects any of the arithmetic of the contract, including
+{IERC20-balanceOf} and {IERC20-transfer}._
+
+### transferAndCall
+
+```solidity
+function transferAndCall(address to, uint256 amount, bytes) external returns (bool success)
 ```
 
 ## MockESECrowdsale
@@ -2781,12 +3598,58 @@ constructor() public
 function transfer(contract IERC20 token, address to, uint256 amount) external
 ```
 
+## MockEeseeFunder
+
+### TransferNotSuccessful
+
+```solidity
+error TransferNotSuccessful()
+```
+
+### fund
+
+```solidity
+function fund(address to) external payable
+```
+
 ## MockRoyaltyEngine
 
 ### getRoyalty
 
 ```solidity
 function getRoyalty(address tokenAddress, uint256 tokenId, uint256 value) public view returns (address payable[] recipients, uint256[] amounts)
+```
+
+## MockUniswapV2Router
+
+### token
+
+```solidity
+contract IERC20 token
+```
+
+### adjustValue
+
+```solidity
+uint256 adjustValue
+```
+
+### constructor
+
+```solidity
+constructor(contract IERC20 _token) public
+```
+
+### swapExactETHForTokens
+
+```solidity
+function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) external payable returns (uint256[] amounts)
+```
+
+### adjust
+
+```solidity
+function adjust(uint256 newValue) external
 ```
 
 ## MockVRFCoordinator

@@ -30,10 +30,11 @@ contract eeseeMinter is IeeseeMinter {
         publicCollection.mint(msg.sender, amount);
 
         tokenIDs = new uint256[](amount);
-        for(uint256 i; i < amount; i++){
+        for(uint256 i; i < amount;){
             tokenIDs[i] = i + startTokenId;
             publicCollection.setURIForTokenId(tokenIDs[i], tokenURIs[i]);
             publicCollection.setRoyaltyForTokenId(tokenIDs[i], royaltyReceiver, royaltyFeeNumerator);
+            unchecked{ i++; }
         }
         collection = IERC721(address(publicCollection));
     }
@@ -68,8 +69,9 @@ contract eeseeMinter is IeeseeMinter {
         privateCollection.renounceOwnership();
 
         tokenIDs = new uint256[](amount);
-        for(uint256 i; i < amount; i++){
+        for(uint256 i; i < amount;){
             tokenIDs[i] = i + startTokenId;
+            unchecked{ i++; }
         }
         collection = IERC721(address(privateCollection));
     }

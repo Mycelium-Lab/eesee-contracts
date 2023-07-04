@@ -2,7 +2,7 @@ const { expect } = require('chai');
 const { ethers } = require('hardhat');
 const assert = require('assert');
 const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
-describe('eeseeMiningRewardsPool', function () {
+describe('eeseeMining', function () {
     let claimerWallet = null;
     let claimerWalletBalances = []
     let ESE;
@@ -29,46 +29,15 @@ describe('eeseeMiningRewardsPool', function () {
         [signer, acc2, claimerWallet] = await ethers.getSigners()
         
         const _ESE = await hre.ethers.getContractFactory('ESE');
-        const _pool = await hre.ethers.getContractFactory('eeseeMiningRewardsPool');
+        const _pool = await hre.ethers.getContractFactory('eeseeMining');
 
-        ESE = await _ESE.deploy(
-            {
+        ESE = await _ESE.deploy([{
                 cliff: 0,
                 duration: 0,
                 TGEMintShare: 10000,
                 beneficiaries: [{addr: signer.address, amount: '1000000000000000000000000'}]
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
             }
-        )
+        ])
         await ESE.deployed()
         
         pool = await _pool.deploy(ESE.address)

@@ -10,4 +10,7 @@ contract MockERC20 is ERC20 {
     function decimals() public pure override returns (uint8) {
         return 6;
     }
+    function transferAndCall(address to, uint256 amount, bytes calldata) external returns (bool success){
+        _transfer(msg.sender, to, amount);
+    }
 }

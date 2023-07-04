@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "./IeeseeMinter.sol";
+import "./IeeseeStaking.sol";
 import "./IRoyaltyEngineV1.sol";
 import "./IAggregationRouterV5.sol";
 
@@ -28,7 +30,7 @@ interface Ieesee {
      * {ticketsBoughtByAddress} - Amount of tickets bought by address.
      * {ticketPrice} - Price of a single ticket.
      * {ticketsBought} - Amount of tickets bought.
-     * {fee} - Fee sent to {feeCollector}.
+     * {fee} - Fee sent to {feeSplitter}.
      * {creationTime} - Listing creation time.
      * {duration} - Listing duration.
      * {winner} - Selected winner.
@@ -57,13 +59,24 @@ interface Ieesee {
      * {ID} - Id of the Drop, starting from 1.
      * {collection} - IERC721 contract address.
      * {earningsCollector} - Address that collects earnings from this drop.
-     * {fee} - Fee sent to {feeCollector}.
+     * {fee} - Fee sent to {feeSplitter}.
      */
     struct Drop {
         uint256 ID;
         IERC721 collection;
         address earningsCollector;
         uint256 fee;
+    }
+
+    ///@dev Because of the Stack too deep error, we combine some constructor arguments into a single stuct
+    struct ChainlinkContructorArgs{
+        address vrfCoordinator;
+        LinkTokenInterface LINK;
+        bytes32 keyHash;
+        uint256 keyHashGasLane;
+        uint16 minimumRequestConfirmations;
+        uint32 callbackGasLimit;
+        AggregatorV3Interface LINK_ETH_DataFeed;
     }
 
     event ListItem(
@@ -154,9 +167,9 @@ interface Ieesee {
         uint256 indexed newFee
     );
 
-    event ChangeFeeCollector(
-        address indexed previousFeeColector, 
-        address indexed newFeeCollector
+    event ChangeChainlinkFeeShare(
+        uint256 indexed previousChainlinkFeeShare, 
+        uint256 indexed newChainlinkFeeShare
     );
 
     event ListDrop(
@@ -169,6 +182,11 @@ interface Ieesee {
         NFT indexed nft,
         address indexed sender,
         uint256 mintFee
+    );
+
+    event ChainlinkFunded(
+        uint256 indexed subscriptionID, 
+        uint256 amount
     );
 
     error CallerNotOwner(uint256 ID);
@@ -189,18 +207,23 @@ interface Ieesee {
     error TicketPriceTooLow();
     error BuyAmountTooLow();
     error FeeTooHigh();
+    error ChainlinkFeeTooHigh();
     error MaxTicketsBoughtByAddressTooHigh();
 
     error AllTicketsBought();
     error NoTicketsBought(uint256 ID);
     error MaxTicketsBoughtByAddress(address _address);
 
+    error InvalidConstructor();
     error InvalidArrayLengths();
     error InvalidSwapDescription();
     error InvalidMsgValue();
     error InvalidEarningsCollector();
     error InvalidQuantity();
     error InvalidRecipient();
+    error InvalidAnswer();
+    error InvalidAmount();
+    error InsufficientETH();
 
     error SwapNotSuccessful();
     error TransferNotSuccessful();
@@ -229,13 +252,15 @@ interface Ieesee {
     );
 
     function ESE() external view returns(IERC20);
+    function staking() external view returns(IeeseeStaking);
     function minter() external view returns(IeeseeMinter);
 
     function minDuration() external view returns(uint256);
     function maxDuration() external view returns(uint256);
     function maxTicketsBoughtByAddress() external view returns(uint256);
     function fee() external view returns(uint256);
-    function feeCollector() external view returns(address);
+    function feeSplitter() external view returns(address);
+    function chainlinkFeeShare() external view returns(uint256);
 
     function LINK() external view returns(LinkTokenInterface);
     function vrfCoordinator() external view returns(VRFCoordinatorV2Interface);
@@ -299,7 +324,7 @@ interface Ieesee {
         uint96 royaltyFeeNumerator
     ) external returns(uint256[] memory IDs, IERC721 collection, uint256[] memory tokenIDs);
 
-    function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent);
+    function buyTickets(uint256 ID, uint256 amount) external payable returns(uint256 tokensSpent);
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external payable returns(uint256 tokensSpent, uint256 ticketsBought);
 
     function listDrop(
@@ -321,8 +346,9 @@ interface Ieesee {
     function batchReceiveTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
 
     function batchReclaimItems(uint256[] memory IDs, address recipient) external returns(IERC721[] memory collections, uint256[] memory tokenIDs);
-    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount);
+    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount, uint256 chainlinkFeeRefund);
 
+    function chainlinkFee(uint256 ID, uint256 amount) external view returns(uint256);
     function getListingsLength() external view returns(uint256 length);
     function getListingTicketIDBuyer(uint256 ID, uint256 ticket) external view returns(address);
     function getListingTicketsBoughtByAddress(uint256 ID, address _address) external view returns(uint256);
@@ -331,7 +357,7 @@ interface Ieesee {
     function changeMaxDuration(uint256 _maxDuration) external;
     function changeMaxTicketsBoughtByAddress(uint256 _maxTicketsBoughtByAddress) external;
     function changeFee(uint256 _fee) external;
-    function changeFeeCollector(address _feeCollector) external;
+    function changeChainlinkFeeShare(uint256 _chainlinkFeeShare) external;
 
-    function fund(uint96 amount) external;
+    function fund(uint256 amount, uint256 amountETH) external returns (uint256);
 }

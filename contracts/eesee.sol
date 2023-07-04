@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/Ieesee.sol";
+import "./interfaces/IUniswapV2Router01.sol";
 
 contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -19,6 +20,8 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
     ///@dev ESE token this contract uses.
     IERC20 public immutable ESE;
+    ///@dev Eesee staking contract. Tracks volume for this contract.
+    IeeseeStaking public immutable staking;
     ///@dev Contract that mints NFTs
     IeeseeMinter public immutable minter;
 
@@ -28,10 +31,12 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     ///@dev Max tickets bought by a single address in a single listing. [1 ether == 100%]
     //Note: Users can still buy 1 ticket even if this check fails. e.g. there is a listing with only 2 tickets and this is set to 20%.
     uint256 public maxTicketsBoughtByAddress = 0.20 ether;
-    ///@dev Fee that is collected to {feeCollector} from each fulfilled listing. [1 ether == 100%]
+    ///@dev Fee that is collected to {feeSplitter} from each fulfilled listing. [1 ether == 100%]
     uint256 public fee = 0.06 ether;
-    ///@dev Address {fee}s are sent to.
-    address public feeCollector;
+    ///@dev Address the {fee}s are sent to.
+    address public immutable feeSplitter;
+    ///@dev The fee for chainlink VRF is shared between ticket buyers & eesee team. [1 ether == 100%]
+    uint256 public chainlinkFeeShare = 0.5 ether;
     ///@dev Denominator for fee & maxTicketsBoughtByAddress variables.
     uint256 private constant denominator = 1 ether;
 
@@ -47,9 +52,18 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     uint16 immutable public minimumRequestConfirmations;
     ///@dev Chainlink VRF V2 gas limit to call fulfillRandomWords().
     uint32 immutable private callbackGasLimit;
+    ///@dev Max ETH cost for ChainlinkVRF call.
+    uint256 immutable private maxChainlinkGas;
+    ///@dev Chainlink oracle data feed for correct ETH => LINK conversions.
+    AggregatorV3Interface immutable private LINK_ETH_DataFeed;
+
 
     ///@dev The Royalty Engine is a contract that provides an easy way for any marketplace to look up royalties for any given token contract.
     IRoyaltyEngineV1 immutable public royaltyEngine;
+    ///@dev UniswapV2 router is used for ETH => LINK conversions. We use UniswapV2 with predefined {route} to have as little contol over ETH as possible.
+    IUniswapV2Router01 immutable public UniswapV2Router;
+    address[] public route;
+
     ///@dev 1inch router used for token swaps.
     address immutable public OneInchRouter;
 
@@ -60,29 +74,53 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
     constructor(
         IERC20 _ESE,
+        IeeseeStaking _staking,
         IeeseeMinter _minter,
-        address _feeCollector,
+        address _feeSplitter,
         IRoyaltyEngineV1 _royaltyEngine,
-        address _vrfCoordinator, 
-        LinkTokenInterface _LINK,
-        bytes32 _keyHash,
-        uint16 _minimumRequestConfirmations,
-        uint32 _callbackGasLimit,
+        ChainlinkContructorArgs memory chainlinkArgs,
+        address _WETH,
+        IUniswapV2Router01 _UniswapV2Router,
         address _OneInchRouter
-    ) VRFConsumerBaseV2(_vrfCoordinator) {
+    ) VRFConsumerBaseV2(chainlinkArgs.vrfCoordinator) {
+        if(
+            address(_ESE) == address(0) ||
+            address(_staking) == address(0) ||
+            address(_minter) == address(0) || 
+            address(_royaltyEngine) == address(0) ||
+            address(_UniswapV2Router) == address(0) ||
+            _feeSplitter == address(0) ||
+            _WETH == address(0) ||
+            _OneInchRouter == address(0) ||
+            chainlinkArgs.vrfCoordinator == address(0) ||
+            address(chainlinkArgs.LINK) == address(0) ||
+            address(chainlinkArgs.LINK_ETH_DataFeed) == address(0) ||
+            chainlinkArgs.keyHashGasLane == 0 ||
+            chainlinkArgs.minimumRequestConfirmations == 0 ||
+            chainlinkArgs.callbackGasLimit == 0
+        ) revert InvalidConstructor();
+
         ESE = _ESE;
+        staking = _staking;
         minter = _minter;
-        feeCollector = _feeCollector;
+        feeSplitter = _feeSplitter;
         royaltyEngine = _royaltyEngine;
 
         // ChainLink stuff. Create subscription for VRF V2.
-        vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
+        vrfCoordinator = VRFCoordinatorV2Interface(chainlinkArgs.vrfCoordinator);
         subscriptionID = vrfCoordinator.createSubscription();
         vrfCoordinator.addConsumer(subscriptionID, address(this));
-        LINK = _LINK;
-        keyHash = _keyHash;
-        minimumRequestConfirmations = _minimumRequestConfirmations;
-        callbackGasLimit = _callbackGasLimit;
+        LINK = chainlinkArgs.LINK;
+        keyHash = chainlinkArgs.keyHash;
+        minimumRequestConfirmations = chainlinkArgs.minimumRequestConfirmations;
+        callbackGasLimit = chainlinkArgs.callbackGasLimit;
+        maxChainlinkGas = chainlinkArgs.keyHashGasLane * (200000 + callbackGasLimit); // 200000 is Verification gas
+        LINK_ETH_DataFeed = chainlinkArgs.LINK_ETH_DataFeed;
+
+        UniswapV2Router = _UniswapV2Router;
+        route = new address[](2);
+        route[0] = _WETH;
+        route[1] = address(LINK);
 
         OneInchRouter = _OneInchRouter;
 
@@ -125,9 +163,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         if(nfts.length != maxTickets.length || maxTickets.length != ticketPrices.length || ticketPrices.length != durations.length)
             revert InvalidArrayLengths();
         IDs = new uint256[](nfts.length);
-        for(uint256 i = 0; i < nfts.length; i++) {
+        for(uint256 i; i < nfts.length;) {
             nfts[i].collection.safeTransferFrom(msg.sender, address(this), nfts[i].tokenID);
             IDs[i] = _listItem(nfts[i], maxTickets[i], ticketPrices[i], durations[i]);
+            unchecked{ i++; }
         }
     }
 
@@ -266,8 +305,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @param amount - Amount of tickets to buy. A single address can't buy more than {maxTicketsBoughtByAddress} of all tickets. 
      
      * @return tokensSpent - ESE tokens spent.
+        Note: {chainlinkFee(ID, amount)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
      */
-    function buyTickets(uint256 ID, uint256 amount) external returns(uint256 tokensSpent){
+    function buyTickets(uint256 ID, uint256 amount) external payable returns(uint256 tokensSpent){
+        if(msg.value != chainlinkFee(ID, amount)) revert InvalidMsgValue();
         tokensSpent = _buyTickets(ID, amount);
         ESE.safeTransferFrom(msg.sender, address(this), tokensSpent);
     }
@@ -279,6 +320,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      
      * @return tokensSpent - Tokens spent.
      * @return ticketsBought - Tickets bought.
+        Note: Additionaly {chainlinkFee(ID, amount)} of ETH must be sent with this transaction to pay for Chainlink VRF call.
      */
     function buyTicketsWithSwap(uint256 ID, bytes calldata swapData) external nonReentrant payable returns(uint256 tokensSpent, uint256 ticketsBought){
         (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
@@ -291,17 +333,18 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         ) revert InvalidSwapDescription();
 
         bool isETH = (address(desc.srcToken) == address(0) || address(desc.srcToken) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        uint256 value; 
         if(isETH){
-            if(msg.value != desc.amount) revert InvalidMsgValue();
+            if(msg.value < desc.amount) revert InvalidMsgValue();
+            value = desc.amount;
         }else{
-            if(msg.value != 0) revert InvalidMsgValue();
             desc.srcToken.safeTransferFrom(msg.sender, address(this), desc.amount);
             desc.srcToken.approve(OneInchRouter, desc.amount);
         }
 
         uint256 returnAmount;
         {
-        (bool success, bytes memory data) = OneInchRouter.call{value: msg.value}(swapData);
+        (bool success, bytes memory data) = OneInchRouter.call{value: value}(swapData);
         if(!success) revert SwapNotSuccessful(); 
         (returnAmount, tokensSpent) = abi.decode(data, (uint256, uint256));
         }
@@ -310,18 +353,31 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         ticketsBought = returnAmount / listing.ticketPrice;
         _buyTickets(ID, ticketsBought);
 
-        // Refund dust
-        uint256 ESEPaid = ticketsBought * listing.ticketPrice;
-        if(returnAmount > ESEPaid){
-            ESE.safeTransfer(address(msg.sender), returnAmount - ESEPaid); 
-        }
-        if(desc.amount > tokensSpent){
-            if(isETH){
-                (bool success, ) = msg.sender.call{value: desc.amount - tokensSpent}("");
+        unchecked{
+            // Refund ESE dust
+            uint256 ESEPaid = ticketsBought * listing.ticketPrice;
+            if(returnAmount > ESEPaid){
+                ESE.safeTransfer(address(msg.sender), returnAmount - ESEPaid); 
+            }
+
+            // Refund chainlink fee
+            value += chainlinkFee(ID, ticketsBought);
+            if(msg.value < value) {
+                revert InvalidMsgValue();
+            } else if(msg.value != value){
+                (bool success, ) = msg.sender.call{value: msg.value - value}("");
                 if(!success) revert TransferNotSuccessful();
-            }else{
-                desc.srcToken.safeTransfer(address(msg.sender), desc.amount - tokensSpent);
-            }   
+            }
+
+            // Refund srcToken dust
+            if(desc.amount > tokensSpent){
+                if(isETH){
+                    (bool success, ) = msg.sender.call{value: desc.amount - tokensSpent}("");
+                    if(!success) revert TransferNotSuccessful();
+                }else{
+                    desc.srcToken.safeTransfer(address(msg.sender), desc.amount - tokensSpent);
+                }   
+            }
         }
     }
 
@@ -459,17 +515,21 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             if(listing.winner == address(0)) revert ListingNotFulfilled(ID);
             if(msg.sender != listing.owner) revert CallerNotOwner(ID);
             if(listing.tokensClaimed) revert TokensAlreadyClaimed(ID);
-
             listing.tokensClaimed = true;
-            uint256 _amount = listing.ticketPrice * listing.maxTickets;
-            _amount -= _collectRoyalties(_amount, listing.nft, listing.owner);
-            _amount -= _collectFee(_amount, listing.fee);
-            amount += _amount;
+            
+            uint256 _amount;
+            //For _amount to overflow there must be more than type.max(uint256) tokens in existence.
+            unchecked {
+                _amount = listing.ticketPrice * listing.maxTickets;
+                _amount -= _collectRoyalties(_amount, listing.nft, listing.owner);
+                _amount -= _collectFee(_amount, listing.fee);
+                amount += _amount; 
+                i++;
+            }
 
             emit ReceiveTokens(ID, recipient, _amount);
 
             if(listing.itemClaimed) delete listings[ID];
-            unchecked{ i++; }
         }
         // Transfer later to save gas
         ESE.safeTransfer(recipient, amount);
@@ -516,11 +576,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
      * @param recipient - Address to send tokens to.
      
      * @return amount - ESE received.
+     * @return chainlinkFeeRefund - Chainlink refund received
      */
-    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount){
-        if(recipient == address(0)){
-            revert InvalidRecipient();
-        }
+    function batchReclaimTokens(uint256[] memory IDs, address recipient) external returns(uint256 amount, uint256 chainlinkFeeRefund){
+        if(recipient == address(0)) revert InvalidRecipient();
         for(uint256 i; i < IDs.length;){
             uint256 ID = IDs[i];
             Listing storage listing = listings[ID];
@@ -529,23 +588,46 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
             if(ticketsBoughtByAddress == 0) revert NoTicketsBought(ID);
             if(block.timestamp <= listing.creationTime + listing.duration) revert ListingNotExpired(ID);
             if(listing.winner != address(0)) revert ListingAlreadyFulfilled(ID);
+            
+            uint256 _amount;
+            unchecked{
+                listing.ticketsBought -= ticketsBoughtByAddress;
+                listing.ticketsBoughtByAddress[msg.sender] = 0;
 
-            listing.ticketsBought -= ticketsBoughtByAddress;
-            listing.ticketsBoughtByAddress[msg.sender] = 0;
+                _amount = ticketsBoughtByAddress * listing.ticketPrice;
+                amount += _amount;
 
-            uint256 _amount = ticketsBoughtByAddress * listing.ticketPrice;
-            amount += _amount;
+                chainlinkFeeRefund += chainlinkFee(ID, ticketsBoughtByAddress);
+                i++; 
+            }
 
             emit ReclaimTokens(ID, msg.sender, recipient, ticketsBoughtByAddress, _amount);
-
             if(listing.ticketsBought == 0 && listing.itemClaimed) delete listings[ID];
-            unchecked{ i++; }
         }
         // Transfer later to save some gas
         ESE.safeTransfer(recipient, amount);
+        staking.updateVolume(-int256(amount), msg.sender);
+        if(chainlinkFeeRefund > 0){
+            (bool success, ) = msg.sender.call{value: chainlinkFeeRefund}("");
+            if(!success) revert TransferNotSuccessful();
+        }
     }
 
     // ============ Getters ============
+    /**
+     * @dev Additional ETH that needs to be passed with buyTickets to pay for Chainlink gas costs.
+     * @param ID - ID of listing to check.
+     * @param amount - Amount of tickets to buy.
+
+     * @return uint256 - ETH gas amount that has to be paid for {amount} of tickets bought.
+     */
+    function chainlinkFee(uint256 ID, uint256 amount) public view returns(uint256){
+        uint256 maxTickets = listings[ID].maxTickets;
+        if(maxTickets == 0) revert ListingNotExists(ID);
+        
+        // Total cost is maxChainlinkGas * chainlinkFeeShare * (amount / maxTickets)
+        return maxChainlinkGas * chainlinkFeeShare * amount / (maxTickets * denominator);
+    }
 
     /**
      * @dev Get length of the listings array.
@@ -616,6 +698,7 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         if(block.timestamp > listing.creationTime + listing.duration) revert ListingExpired(ID);
 
         tokensSpent = listing.ticketPrice * amount;
+        staking.updateVolume(int256(tokensSpent), msg.sender);
 
         for(uint256 i; i < amount;){
             emit BuyTicket(ID, msg.sender, listing.ticketsBought, listing.ticketPrice);
@@ -625,8 +708,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
                 i++; 
             }
         }
-        listing.ticketsBoughtByAddress[msg.sender] += amount;
-
+        //Won't ever overflow because of the gas cost
+        unchecked {
+            listing.ticketsBoughtByAddress[msg.sender] += amount;
+        }
         //Allow buy single tickets even if bought amount is more than maxTicketsBoughtByAddress
         if(listing.ticketsBoughtByAddress[msg.sender] > 1){
             if(listing.ticketsBoughtByAddress[msg.sender] * denominator / listing.maxTickets > maxTicketsBoughtByAddress) revert MaxTicketsBoughtByAddress(msg.sender);
@@ -642,11 +727,13 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
 
     function _collectRoyalties(uint256 value, NFT memory nft, address listingOwner) internal returns(uint256 royaltyAmount) {
         (address payable[] memory recipients, uint256[] memory amounts) = royaltyEngine.getRoyalty(address(nft.collection), nft.tokenID, value);
-        for(uint256 i = 0; i < recipients.length;){
+        for(uint256 i; i < recipients.length;){
             //There is no reason to collect royalty from owner if it goes to owner
             if (recipients[i] != address(0) && recipients[i] != listingOwner && amounts[i] != 0){
                 ESE.safeTransfer(recipients[i], amounts[i]);
-                royaltyAmount += amounts[i];
+                unchecked {
+                    royaltyAmount += amounts[i];
+                }
                 emit CollectRoyalty(recipients[i], amounts[i]);
             }
             unchecked{ i++; }
@@ -654,11 +741,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     }
 
     function _collectFee(uint256 amount, uint256 _fee) internal returns(uint256 feeAmount){
-        if(feeCollector == address(0)) return 0;
         feeAmount = amount * _fee / denominator;
         if(feeAmount > 0){
-            ESE.safeTransfer(feeCollector, feeAmount);
-            emit CollectFee(feeCollector, feeAmount);
+            ESE.safeTransfer(feeSplitter, feeAmount);
+            emit CollectFee(feeSplitter, feeAmount);
         }
     }
 
@@ -672,9 +758,10 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
         Listing storage listing = listings[ID];
 
         if(block.timestamp > listing.creationTime + listing.duration) revert ListingExpired(ID);
-
-        uint256 chosenTicket = randomWords[0] % listing.maxTickets;
-        listing.winner = listing.ticketIDBuyer[chosenTicket];
+        unchecked{
+            uint256 chosenTicket = randomWords[0] % listing.maxTickets;
+            listing.winner = listing.ticketIDBuyer[chosenTicket];
+        }
 
         delete chainlinkRequestIDs[requestID];
         emit FulfillListing(ID, listing.nft, listing.winner);
@@ -727,25 +814,49 @@ contract eesee is Ieesee, VRFConsumerBaseV2, ERC721Holder, Ownable, ReentrancyGu
     }
 
     /**
-     * @dev Changes feeCollector. Emits {ChangeFeeCollector} event.
-     * @param _feeCollector - New feeCollector.
+     * @dev Changes chainlinkFeeShare. Emits {ChangeChainlinkFeeShare} event.
+     * @param _chainlinkFeeShare - New chainlink fee share.
      * Note: This function can only be called by owner.
      */
-    function changeFeeCollector(address _feeCollector) external onlyOwner{
-        emit ChangeFeeCollector(feeCollector, _feeCollector);
-        feeCollector = _feeCollector;
+    function changeChainlinkFeeShare(uint256 _chainlinkFeeShare) external onlyOwner {
+        if(_chainlinkFeeShare > denominator) revert ChainlinkFeeTooHigh();
+
+        emit ChangeChainlinkFeeShare(chainlinkFeeShare, _chainlinkFeeShare);
+        chainlinkFeeShare = _chainlinkFeeShare;
     }
 
     /**
      * @dev Fund function for Chainlink's VRF V2 subscription.
      * @param amount - Amount of LINK to fund subscription with.
+     * @param amountETH - Amount of ETH to swap using Uniswap.
+
+     * @return uint256 - Amount funded
      */
-    function fund(uint96 amount) external {
-        IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), amount);
+    function fund(uint256 amount, uint256 amountETH) external returns (uint256){
+        if(amount != 0){
+            IERC20(address(LINK)).safeTransferFrom(msg.sender, address(this), amount);
+        }
+        
+        if(amountETH > address(this).balance) revert InsufficientETH();
+        if(amountETH != 0){
+            uint256[] memory amounts = UniswapV2Router.swapExactETHForTokens{value: amountETH}(0, route, address(this), block.timestamp);
+            (,int answer,,,) = LINK_ETH_DataFeed.latestRoundData();
+            if(answer <= 0) revert InvalidAnswer();
+
+            // max slippage is 1%
+            uint256 minAmountWithSlippage = amountETH * 1 ether * 99 / (uint256(answer) * 100);
+            if(amounts[1] < minAmountWithSlippage) revert InvalidAmount();
+            amount += amounts[1];
+        }
+        if(amount == 0) revert InvalidAmount();
+
         LINK.transferAndCall(
             address(vrfCoordinator),
             amount,
             abi.encode(subscriptionID)
         );
+
+        emit ChainlinkFunded(subscriptionID, amount);
+        return amount;
     }
 }

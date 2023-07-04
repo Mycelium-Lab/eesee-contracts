@@ -61,10 +61,11 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
      * @return index - Index of current sale stage.
      */
     function getSaleStage() public view returns (uint8 index) {
-        for(uint8 i = 0; i < stages.length; i ++) {
+        for(uint8 i = 0; i < stages.length;) {
             if (block.timestamp >= stages[i].startTimestamp && (block.timestamp <= stages[i].endTimestamp || stages[i].endTimestamp == 0)){
                 return i;
             }
+            unchecked{ i++; }
         }
         return 0;
     }
@@ -120,7 +121,7 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
         if(presalesOptions.length > 5) revert PresaleStageLimitExceeded();
 
         uint256 timePassed = mintStartTimestamp;
-        for(uint8 i = 0; i < presalesOptions.length; i ++) {
+        for(uint8 i = 0; i < presalesOptions.length;) {
             if(presalesOptions[i].duration == 0) revert ZeroSaleStageDuration();
             
             SaleStage storage presale = stages.push();
@@ -129,6 +130,7 @@ contract eeseeNFTDrop is IeeseeNFTDrop, ERC721A, ERC2981, Ownable, DefaultOperat
             presale.endTimestamp = timePassed;
             timePassed += 1;
             presale.stageOptions = presalesOptions[i];
+            unchecked{ i++; }
         }
 
         SaleStage storage publicStage = stages.push();

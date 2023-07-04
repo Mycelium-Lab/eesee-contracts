@@ -7,6 +7,7 @@ const {
   const { ethers, network } = require("hardhat");
   const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
   const assert = require("assert");
+  const { getContractAddress } = require('@ethersproject/address')
   describe("eeseeNFTDrop", function () {
     const publicStage = {
         name: 'Public Stage',
@@ -95,45 +96,15 @@ const {
         const _minter = await hre.ethers.getContractFactory("eeseeMinter");
         const _royaltyEngine = await hre.ethers.getContractFactory("MockRoyaltyEngine");
         const _eeseeNFTDrop = await hre.ethers.getContractFactory("eeseeNFTDrop")
+        const _eeseeStaking = await hre.ethers.getContractFactory("eeseeStaking");
 
-        ESE = await _ESE.deploy(
-            {
+        ESE = await _ESE.deploy([{
                 cliff: 0,
                 duration: 0,
                 TGEMintShare: 10000,
                 beneficiaries: [{addr: signer.address, amount:'1000000000000000000000000'}]
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
-            },
-            {
-                cliff: 0,
-                duration: 0,
-                TGEMintShare: 0,
-                beneficiaries: []
             }
-        )
+        ])
         await ESE.deployed()
 
         mockVRF = await _mockVRF.deploy()
@@ -145,19 +116,36 @@ const {
         royaltyEninge = await _royaltyEngine.deploy();
         await royaltyEninge.deployed()
 
+        const transactionCount = await signer.getTransactionCount()
+        const futureStakingAddress = getContractAddress({
+          from: signer.address,
+          nonce: transactionCount + 1
+        })
+
         eesee = await _eesee.deploy(
             ESE.address, 
+            futureStakingAddress,
             minter.address, 
             feeCollector.address, 
             royaltyEninge.address, 
-            mockVRF.address,
-            zeroAddress,//ChainLink token
-            '0x0000000000000000000000000000000000000000000000000000000000000000',//Key Hash
-            0,//minimumRequestConfirmations
-            50000,//callbackGasLimit
-            '0x0000000000000000000000000000000000000000'//1inch, does not matter in this test
+            {
+                vrfCoordinator: mockVRF.address,
+                LINK: oneAddress,// does not matter in this test
+                keyHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                keyHashGasLane: 200000000000,
+                minimumRequestConfirmations: 1,
+                callbackGasLimit: 50000,
+                LINK_ETH_DataFeed: oneAddress// does not matter in this test
+            },
+            oneAddress,//Weth, does not matter in this test
+            oneAddress,//uniswap, does not matter in this test
+            oneAddress//1inch, does not matter in this test
         )
         await eesee.deployed()
+
+        staking = await _eeseeStaking.deploy(ESE.address, eesee.address, [{volumeBreakpoint: 500, rewardRateFlexible: 500000, rewardRateLocked: 500000}])
+        await staking.deployed()
+
         currentTimestamp = (await ethers.provider.getBlock()).timestamp;
         for (let j = 0; j < 9; j ++) {
             const wallet = ethers.Wallet.createRandom().connect(ethers.provider)

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract eeseeMiningRewardsPool is Ownable{
+contract eeseeMining is Ownable{
     using SafeERC20 for IERC20;
     /**
      * @dev Claim:
@@ -44,6 +44,7 @@ contract eeseeMiningRewardsPool is Ownable{
     error AlreadyClaimed();
 
     constructor(IERC20 _rewardToken) {
+        if(address(_rewardToken) == address(0)) revert("eeseeMining: Invalid Reward Token");
         rewardToken = _rewardToken;
     }
 
@@ -52,7 +53,7 @@ contract eeseeMiningRewardsPool is Ownable{
      * @param claims - Claim structs.
      */
     function claimRewards(Claim[] memory claims) external{
-        for (uint256 i = 0; i < claims.length; i++) {
+        for (uint256 i = 0; i < claims.length;) {
             Claim memory claim = claims[i];
             if(!verifyClaim(msg.sender, claim)) revert InvalidMerkleProof();
             if(isClaimed[msg.sender][claim.rewardID]) revert AlreadyClaimed();
@@ -66,6 +67,7 @@ contract eeseeMiningRewardsPool is Ownable{
                 msg.sender,
                 claim.balance
             );
+            unchecked{ i++; }
         }
     }
 
@@ -76,7 +78,7 @@ contract eeseeMiningRewardsPool is Ownable{
     function addReward(bytes32 merkleRoot) external onlyOwner {
         rewardRoot[rewardID] = merkleRoot;
         emit RewardAdded(rewardID, merkleRoot);
-        rewardID += 1;
+        unchecked{ rewardID += 1; }
     }
 
     /**
@@ -87,11 +89,12 @@ contract eeseeMiningRewardsPool is Ownable{
      * @return rewards - Rewards to be claimed.
      */
     function getRewards(address claimer, Claim[] memory claims) external view returns (uint256 rewards) {
-        for (uint256 i = 0; i < claims.length; i++) {
+        for (uint256 i = 0; i < claims.length;) {
             Claim memory claim = claims[i];
             if(verifyClaim(claimer, claim) && !isClaimed[claimer][claim.rewardID]){
                 rewards += claim.balance;
             }
+            unchecked{ i++; }
         }
     }
 
